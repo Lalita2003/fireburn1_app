@@ -13,8 +13,10 @@ class SignupVillageHeadPage extends StatefulWidget {
 
 class _SignupVillageHeadPageState extends State<SignupVillageHeadPage> {
   final Color primaryBrown = const Color(0xFF5D4037);
-  final Color lightBrown = const Color(0xFFD7CCC8);
+  final Color gradientStart = const Color.fromARGB(255, 208, 146, 1);
+  final Color gradientEnd = const Color(0xFFEF6C00);
   final Color backgroundColor = const Color(0xFFFFF3E0);
+  final Color lightBrown = const Color(0xFFFFF8E1);
 
   bool acceptTerms = false;
   bool isLoading = false;
@@ -85,12 +87,20 @@ class _SignupVillageHeadPageState extends State<SignupVillageHeadPage> {
     return Scaffold(
       backgroundColor: backgroundColor,
       appBar: AppBar(
-        backgroundColor: primaryBrown,
-        iconTheme: const IconThemeData(color: Colors.white),
         title: const Text(
           'สมัครสมาชิก - ผู้ใหญ่บ้าน',
-          style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold),
+          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 20),
         ),
+        flexibleSpace: Container(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [gradientStart, gradientEnd],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+          ),
+        ),
+        iconTheme: const IconThemeData(color: Colors.white),
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
@@ -113,7 +123,7 @@ class _SignupVillageHeadPageState extends State<SignupVillageHeadPage> {
               children: [
                 Checkbox(
                   value: acceptTerms,
-                  activeColor: primaryBrown,
+                  activeColor: gradientEnd,
                   onChanged: (value) {
                     setState(() {
                       acceptTerms = value ?? false;
@@ -145,16 +155,29 @@ class _SignupVillageHeadPageState extends State<SignupVillageHeadPage> {
                         registerVillageHead();
                       },
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: primaryBrown,
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
+                  padding: EdgeInsets.zero,
                   elevation: 4,
                 ),
-                child: isLoading
-                    ? const CircularProgressIndicator(color: Colors.white)
-                    : const Text(
-                        'สมัครสมาชิก',
-                        style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white),
-                      ),
+                child: Ink(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [gradientStart, gradientEnd],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    borderRadius: BorderRadius.circular(30),
+                  ),
+                  child: Container(
+                    alignment: Alignment.center,
+                    child: isLoading
+                        ? const CircularProgressIndicator(color: Colors.white)
+                        : const Text(
+                            'สมัครสมาชิก',
+                            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white),
+                          ),
+                  ),
+                ),
               ),
             ),
           ],
@@ -188,15 +211,15 @@ class _SignupVillageHeadPageState extends State<SignupVillageHeadPage> {
           labelText: label,
           labelStyle: TextStyle(color: primaryBrown, fontSize: 14),
           filled: true,
-          fillColor: lightBrown.withOpacity(0.15),
+          fillColor: lightBrown.withOpacity(0.5),
           contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
           border: OutlineInputBorder(
             borderRadius: BorderRadius.circular(12),
-            borderSide: const BorderSide(color: Colors.brown),
+            borderSide: BorderSide(color: gradientEnd),
           ),
           focusedBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(12),
-            borderSide: BorderSide(color: primaryBrown, width: 2),
+            borderSide: BorderSide(color: gradientStart, width: 2),
           ),
         ),
       ),

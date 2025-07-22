@@ -12,8 +12,10 @@ class SignupAdminPage extends StatefulWidget {
 
 class _SignupAdminPageState extends State<SignupAdminPage> {
   final Color primaryBrown = const Color(0xFF5D4037);
-  final Color lightBrown = const Color(0xFFD7CCC8);
+  final Color gradientStart = const Color.fromARGB(255, 208, 146, 1);
+  final Color gradientEnd = const Color(0xFFEF6C00);
   final Color backgroundColor = const Color(0xFFFFF3E0);
+  final Color lightBrown = const Color(0xFFFFF8E1);
 
   bool acceptTerms = false;
   bool isLoading = false;
@@ -78,9 +80,9 @@ class _SignupAdminPageState extends State<SignupAdminPage> {
 
       if (data['status'] == 'success') {
         Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (context) => const LoginPage()),
-      );
+          context,
+          MaterialPageRoute(builder: (context) => const LoginPage()),
+        );
       }
     } catch (e) {
       showSnack('เกิดข้อผิดพลาดในการเชื่อมต่อ');
@@ -94,12 +96,20 @@ class _SignupAdminPageState extends State<SignupAdminPage> {
     return Scaffold(
       backgroundColor: backgroundColor,
       appBar: AppBar(
-        backgroundColor: primaryBrown,
-        iconTheme: const IconThemeData(color: Colors.white),
         title: const Text(
           'สมัครสมาชิก - Admin',
           style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold),
         ),
+        flexibleSpace: Container(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [gradientStart, gradientEnd],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+          ),
+        ),
+        iconTheme: const IconThemeData(color: Colors.white),
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
@@ -118,7 +128,7 @@ class _SignupAdminPageState extends State<SignupAdminPage> {
               children: [
                 Checkbox(
                   value: acceptTerms,
-                  activeColor: primaryBrown,
+                  activeColor: gradientEnd,
                   onChanged: (value) {
                     setState(() {
                       acceptTerms = value ?? false;
@@ -140,18 +150,29 @@ class _SignupAdminPageState extends State<SignupAdminPage> {
               child: ElevatedButton(
                 onPressed: isLoading ? null : handleSignup,
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: primaryBrown,
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
+                  padding: EdgeInsets.zero,
                   elevation: 4,
                 ),
-                child: isLoading
-                    ? const CircularProgressIndicator(
-                        valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                      )
-                    : const Text(
-                        'สมัครสมาชิก',
-                        style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white),
-                      ),
+                child: Ink(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [gradientStart, gradientEnd],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    borderRadius: BorderRadius.circular(30),
+                  ),
+                  child: Container(
+                    alignment: Alignment.center,
+                    child: isLoading
+                        ? const CircularProgressIndicator(color: Colors.white)
+                        : const Text(
+                            'สมัครสมาชิก',
+                            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white),
+                          ),
+                  ),
+                ),
               ),
             ),
           ],
@@ -182,15 +203,15 @@ class _SignupAdminPageState extends State<SignupAdminPage> {
           labelText: label,
           labelStyle: TextStyle(color: primaryBrown, fontSize: 14),
           filled: true,
-          fillColor: lightBrown.withOpacity(0.15),
+          fillColor: lightBrown.withOpacity(0.5),
           contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
           border: OutlineInputBorder(
             borderRadius: BorderRadius.circular(12),
-            borderSide: const BorderSide(color: Colors.brown),
+            borderSide: BorderSide(color: gradientEnd),
           ),
           focusedBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(12),
-            borderSide: BorderSide(color: primaryBrown, width: 2),
+            borderSide: BorderSide(color: gradientStart, width: 2),
           ),
         ),
       ),

@@ -3,6 +3,11 @@
         android:label="fireburn1_app"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
+
+        <meta-data
+            android:name="com.google.android.geo.API_KEY"
+            android:value="AIzaSyAG9V7_Iu_xinVIS7lNS5ARLsMCtQ3dy_o" />
+
         <activity
             android:name=".MainActivity"
             android:exported="true"

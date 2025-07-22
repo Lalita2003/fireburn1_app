@@ -12,8 +12,10 @@ class SignupUserPage extends StatefulWidget {
 
 class _SignupUserPageState extends State<SignupUserPage> {
   final Color primaryBrown = const Color(0xFF5D4037);
-  final Color lightBrown = const Color(0xFFD7CCC8);
+  final Color gradientStart = const Color.fromARGB(255, 208, 146, 1);
+  final Color gradientEnd = const Color(0xFFEF6C00);
   final Color backgroundColor = const Color(0xFFFFF3E0);
+  final Color lightBrown = const Color(0xFFFFF8E1);
 
   bool acceptTerms = false;
   bool isLoading = false;
@@ -61,7 +63,6 @@ class _SignupUserPageState extends State<SignupUserPage> {
 
     setState(() => isLoading = true);
 
-    // *** เปลี่ยน URL นี้เป็น IP หรือโดเมนของเซิร์ฟเวอร์คุณแทน localhost ***
     final uri = Uri.parse('http://localhost/flutter_fire/register_user.php');
 
     try {
@@ -77,7 +78,6 @@ class _SignupUserPageState extends State<SignupUserPage> {
         "agency": "", // สำหรับ user ทั่วไป
       });
 
-      // ตรวจสอบสถานะ HTTP ก่อน decode
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
         setState(() => isLoading = false);
@@ -85,10 +85,9 @@ class _SignupUserPageState extends State<SignupUserPage> {
         if (data['status'] == 'success') {
           showSnack("สมัครสมาชิกสำเร็จ");
           Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (context) => const LoginPage()),
-        );
-        
+            context,
+            MaterialPageRoute(builder: (context) => const LoginPage()),
+          );
         } else {
           showSnack(data['message'] ?? "เกิดข้อผิดพลาดในการสมัครสมาชิก");
         }
@@ -112,7 +111,15 @@ class _SignupUserPageState extends State<SignupUserPage> {
           'สมัครสมาชิก - ผู้ใช้ทั่วไป',
           style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 20),
         ),
-        backgroundColor: primaryBrown,
+        flexibleSpace: Container(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [gradientStart, gradientEnd],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+          ),
+        ),
         iconTheme: const IconThemeData(color: Colors.white),
       ),
       body: SingleChildScrollView(
@@ -137,7 +144,7 @@ class _SignupUserPageState extends State<SignupUserPage> {
               children: [
                 Checkbox(
                   value: acceptTerms,
-                  activeColor: primaryBrown,
+                  activeColor: gradientEnd,
                   onChanged: (value) {
                     setState(() {
                       acceptTerms = value ?? false;
@@ -159,16 +166,29 @@ class _SignupUserPageState extends State<SignupUserPage> {
               child: ElevatedButton(
                 onPressed: isLoading ? null : registerUser,
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: primaryBrown,
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
+                  padding: EdgeInsets.zero,
                   elevation: 4,
                 ),
-                child: isLoading
-                    ? const CircularProgressIndicator(color: Colors.white)
-                    : const Text(
-                        'สมัครสมาชิก',
-                        style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white),
-                      ),
+                child: Ink(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [gradientStart, gradientEnd],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    borderRadius: BorderRadius.circular(30),
+                  ),
+                  child: Container(
+                    alignment: Alignment.center,
+                    child: isLoading
+                        ? const CircularProgressIndicator(color: Colors.white)
+                        : const Text(
+                            'สมัครสมาชิก',
+                            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white),
+                          ),
+                  ),
+                ),
               ),
             ),
           ],
@@ -198,15 +218,15 @@ class _SignupUserPageState extends State<SignupUserPage> {
           labelText: label,
           labelStyle: TextStyle(color: primaryBrown, fontSize: 14),
           filled: true,
-          fillColor: lightBrown.withOpacity(0.15),
+          fillColor: lightBrown.withOpacity(0.5),
           contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
           border: OutlineInputBorder(
             borderRadius: BorderRadius.circular(12),
-            borderSide: const BorderSide(color: Colors.brown),
+            borderSide: BorderSide(color: gradientEnd),
           ),
           focusedBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(12),
-            borderSide: BorderSide(color: primaryBrown, width: 2),
+            borderSide: BorderSide(color: gradientStart, width: 2),
           ),
         ),
       ),

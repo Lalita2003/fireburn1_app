@@ -1,10 +1,12 @@
+import 'package:fireburn1_app/Welcomehome/AdminHomePage.dart';
+import 'package:fireburn1_app/Welcomehome/OfficerHomePage.dart';
+import 'package:fireburn1_app/Welcomehome/UserHomePage.dart';
+import 'package:fireburn1_app/Welcomehome/VillageHeadHomePage.dart';
 import 'package:fireburn1_app/register/SelectRole.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
-
-import 'package:fireburn1_app/Welcomehome/homepage.dart'; // เปลี่ยนตามพาธจริง
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -15,8 +17,7 @@ class LoginPage extends StatefulWidget {
 
 class _LoginPageState extends State<LoginPage> {
   final Color primaryBrown = const Color(0xFF5D4037);
-  final Color lightBrown = const Color(0xFFD7CCC8);
-  final Color backgroundColor = const Color(0xFFFFF3E0);
+  final Color backgroundColor = Colors.white; // พื้นหลังสีขาว
 
   final TextEditingController emailController = TextEditingController();
   final TextEditingController passwordController = TextEditingController();
@@ -43,7 +44,7 @@ class _LoginPageState extends State<LoginPage> {
     });
 
     try {
-      final uri = Uri.parse('http://localhost/flutter_fire/login.php'); // แก้ URL เป็น IP หรือ domain จริง
+      final uri = Uri.parse('http://localhost/flutter_fire/login.php');
       final response = await http.post(uri, body: {
         'email': email,
         'password': password,
@@ -52,11 +53,28 @@ class _LoginPageState extends State<LoginPage> {
       final data = json.decode(response.body);
 
       if (data['status'] == 'success') {
-        showSnack("เข้าสู่ระบบสำเร็จ: ยินดีต้อนรับ ${data['user']['username']}");
+        final user = data['user'];
+        final role = user['role'];
+
+        showSnack("เข้าสู่ระบบสำเร็จ: ยินดีต้อนรับ ${user['username']}");
+
+        Widget homePage;
+        if (role == 'user') {
+          homePage = const UserHomePage();
+        } else if (role == 'village_head') {
+          homePage = const VillageHeadHomePage();
+        } else if (role == 'officer') {
+          homePage = const OfficerHomePage();
+        } else if (role == 'admin') {
+          homePage = const AdminHomePage();
+        } else {
+          showSnack("บทบาทไม่ถูกต้อง");
+          return;
+        }
 
         Navigator.pushReplacement(
           context,
-          MaterialPageRoute(builder: (context) => const HomePage()),
+          MaterialPageRoute(builder: (_) => homePage),
         );
       } else {
         showSnack(data['message'] ?? "เข้าสู่ระบบไม่สำเร็จ");
@@ -80,183 +98,170 @@ class _LoginPageState extends State<LoginPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      resizeToAvoidBottomInset: false,
-      backgroundColor: backgroundColor,
-      appBar: AppBar(
-        elevation: 0,
-        backgroundColor: Colors.transparent,
-        systemOverlayStyle: SystemUiOverlayStyle.dark,
-        leading: IconButton(
-          onPressed: () {
-            Navigator.pop(context);
-          },
-          icon: Icon(
-            Icons.arrow_back_ios,
-            size: 20,
-            color: primaryBrown,
+      body: Stack(
+        children: [
+          // Background gradient สีส้มอ่อน ไล่ไปขาว
+          Container(
+            decoration: const BoxDecoration(
+              gradient: LinearGradient(
+                colors: [Color(0xFFFFF3E0), Colors.white],
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+              ),
+            ),
           ),
-        ),
-      ),
-      body: Container(
-        height: MediaQuery.of(context).size.height,
-        width: double.infinity,
-        color: backgroundColor,
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: <Widget>[
-            Text(
-              "Login",
-              style: TextStyle(
-                fontSize: 36,
-                fontWeight: FontWeight.bold,
-                color: primaryBrown,
-                letterSpacing: 1.2,
+
+          // วงกลมโปร่งใสสีส้มวางลอยๆ
+          Positioned(
+            top: -50,
+            left: -30,
+            child: Container(
+              width: 150,
+              height: 150,
+              decoration: BoxDecoration(
+                color: const Color(0xFFEF6C00).withOpacity(0.15),
+                shape: BoxShape.circle,
               ),
             ),
-            const SizedBox(height: 10),
-            Text(
-              "Login to your burning account",
-              style: TextStyle(
-                fontSize: 16,
-                color: primaryBrown.withOpacity(0.8),
+          ),
+          Positioned(
+            bottom: -40,
+            right: -20,
+            child: Container(
+              width: 180,
+              height: 180,
+              decoration: BoxDecoration(
+                color: const Color(0xFFFFB300).withOpacity(0.15),
+                shape: BoxShape.circle,
               ),
             ),
-            const SizedBox(height: 40),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 40),
+          ),
+
+          // เนื้อหา LoginPage อยู่ด้านบน
+          SafeArea(
+            child: Container(
+              width: double.infinity,
               child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  inputFile(
-                    label: "Email",
-                    controller: emailController,
-                    textColor: primaryBrown,
-                    borderColor: primaryBrown,
-                  ),
-                  inputFile(
-                    label: "Password",
-                    obscureText: true,
-                    controller: passwordController,
-                    textColor: primaryBrown,
-                    borderColor: primaryBrown,
-                  ),
-                  const SizedBox(height: 30),
-                  Container(
-                    padding: const EdgeInsets.only(top: 3, left: 3),
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(50),
-                      border: Border.all(color: primaryBrown),
-                      boxShadow: [
-                        BoxShadow(
-                          color: primaryBrown.withOpacity(0.4),
-                          blurRadius: 8,
-                          offset: const Offset(0, 4),
-                        ),
-                      ],
-                    ),
-                    child: ElevatedButton(
-                      onPressed: isLoading ? null : loginUser,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: primaryBrown,
-                        minimumSize: const Size(double.infinity, 60),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(50),
-                        ),
-                        elevation: 5,
+                  ShaderMask(
+                    shaderCallback: (bounds) => const LinearGradient(
+                      colors: [Color(0xFFDD6B00), Color(0xFFC14400)],
+                      begin: Alignment.centerLeft,
+                      end: Alignment.centerRight,
+                    ).createShader(bounds),
+                    child: Text(
+                      "Login",
+                      style: TextStyle(
+                        fontSize: 36,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white, // ต้องใส่สีนี้ไว้
                       ),
-                      child: isLoading
-                          ? const CircularProgressIndicator(color: Colors.white)
-                          : const Text(
-                              "Login",
-                              style: TextStyle(
-                                fontWeight: FontWeight.w600,
-                                fontSize: 18,
-                                color: Colors.white,
-                                shadows: [
-                                  Shadow(
-                                    offset: Offset(0, 1),
-                                    blurRadius: 3,
-                                    color: Colors.black26,
-                                  ),
-                                ],
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  ShaderMask(
+                    shaderCallback: (bounds) => const LinearGradient(
+                      colors: [Color(0xFFFFB300), Color(0xFFEF6C00)],
+                      begin: Alignment.centerLeft,
+                      end: Alignment.centerRight,
+                    ).createShader(bounds),
+                    child: Text(
+                      "Login to your burning account",
+                      style: TextStyle(
+                        fontSize: 16,
+                        color: Colors.white, // ต้องใส่สีนี้ไว้
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 40),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 40),
+                    child: Column(
+                      children: [
+                        inputField(label: "Email", controller: emailController, primaryBrown: primaryBrown),
+                        inputField(label: "Password", obscureText: true, controller: passwordController, primaryBrown: primaryBrown),
+                        const SizedBox(height: 30),
+                        Container(
+                          width: double.infinity,
+                          height: 50,
+                          decoration: BoxDecoration(
+                            gradient: const LinearGradient(
+                              colors: [Color.fromARGB(255, 208, 146, 1), Color(0xFFEF6C00)],
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                            ),
+                            borderRadius: BorderRadius.circular(30),
+                          ),
+                          child: ElevatedButton(
+                            style: ElevatedButton.styleFrom(
+                              elevation: 0,
+                              backgroundColor: Colors.transparent,
+                              shadowColor: Colors.transparent,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(30),
                               ),
                             ),
-                    ),
-                  ),
-                  const SizedBox(height: 20),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: <Widget>[
-                      Text(
-                        "Don't have an account?",
-                        style: TextStyle(color: primaryBrown.withOpacity(0.7)),
-                      ),
-                      GestureDetector(
-                        onTap: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(builder: (_) => SelectRolePage()),
-                          );
-                        },
-                        child: Text(
-                          " Sign up",
-                          style: TextStyle(
-                            fontWeight: FontWeight.w600,
-                            fontSize: 18,
-                            color: primaryBrown,
+                            onPressed: isLoading ? null : loginUser,
+                            child: isLoading
+                                ? const CircularProgressIndicator(color: Colors.white)
+                                : const Text(
+                                    "Login",
+                                    style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 18),
+                                  ),
                           ),
                         ),
-                      )
-                    ],
+                        const SizedBox(height: 20),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Text(
+                              "ไม่มีบัญชีใช่ไหม?",
+                              style: TextStyle(color: primaryBrown.withOpacity(0.7)),
+                            ),
+                            GestureDetector(
+                              onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => SelectRolePage())),
+                              child: Text(
+                                " สมัครสมาชิก",
+                                style: TextStyle(color: primaryBrown, fontWeight: FontWeight.bold),
+                              ),
+                            )
+                          ],
+                        )
+                      ],
+                    ),
                   ),
                 ],
               ),
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
-}
 
-Widget inputFile({
-  required String label,
-  bool obscureText = false,
-  Color textColor = Colors.black,
-  Color borderColor = Colors.grey,
-  TextEditingController? controller,
-}) {
-  return Column(
-    crossAxisAlignment: CrossAxisAlignment.start,
-    children: <Widget>[
-      Text(
-        label,
-        style: TextStyle(
-          fontSize: 15,
-          fontWeight: FontWeight.w400,
-          color: textColor,
+  Widget inputField({
+    required String label,
+    bool obscureText = false,
+    required TextEditingController controller,
+    required Color primaryBrown,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(label, style: TextStyle(color: primaryBrown)),
+        const SizedBox(height: 5),
+        TextField(
+          controller: controller,
+          obscureText: obscureText,
+          decoration: InputDecoration(
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+            filled: true,
+            fillColor: Colors.white,
+          ),
         ),
-      ),
-      const SizedBox(height: 5),
-      TextField(
-        controller: controller,
-        obscureText: obscureText,
-        style: TextStyle(color: textColor),
-        decoration: InputDecoration(
-          contentPadding: const EdgeInsets.symmetric(vertical: 0, horizontal: 10),
-          enabledBorder: OutlineInputBorder(
-            borderSide: BorderSide(color: borderColor),
-          ),
-          focusedBorder: OutlineInputBorder(
-            borderSide: BorderSide(color: borderColor, width: 2),
-          ),
-          border: OutlineInputBorder(
-            borderSide: BorderSide(color: borderColor),
-          ),
-          fillColor: borderColor.withOpacity(0.1),
-          filled: true,
-        ),
-      ),
-      const SizedBox(height: 15),
-    ],
-  );
+        const SizedBox(height: 15),
+      ],
+    );
+  }
 }
