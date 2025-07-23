@@ -72,6 +72,10 @@ flutter:
   # To add assets to your application, add an assets section, like this:
   assets:
   - assets/Red_Logo.png
+  - assets/api/thai_tambons.json
+  - assets/api/thai_amphures.json
+  - assets/api/thai_provinces.json
+
   #   - images/a_dot_ham.jpeg
 
   # An image asset can refer to one or more resolution-specific "variants", see

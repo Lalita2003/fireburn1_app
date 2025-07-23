@@ -1,5 +1,6 @@
 import 'package:fireburn1_app/login.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 
@@ -23,56 +24,123 @@ class _SignupOfficerPageState extends State<SignupOfficerPage> {
   final TextEditingController usernameController = TextEditingController();
   final TextEditingController emailController = TextEditingController();
   final TextEditingController phoneController = TextEditingController();
-  final TextEditingController provinceController = TextEditingController();
   final TextEditingController agencyController = TextEditingController();
   final TextEditingController passwordController = TextEditingController();
-  final TextEditingController confirmPasswordController = TextEditingController();
+  final TextEditingController confirmPasswordController =
+      TextEditingController();
+
+  List provinces = [];
+  List districts = [];
+  List subdistricts = [];
+
+  String? selectedProvince;
+  String? selectedDistrict;
+  String? selectedSubdistrict;
 
   @override
-  void dispose() {
-    usernameController.dispose();
-    emailController.dispose();
-    phoneController.dispose();
-    provinceController.dispose();
-    agencyController.dispose();
-    passwordController.dispose();
-    confirmPasswordController.dispose();
-    super.dispose();
+  void initState() {
+    super.initState();
+    loadProvinces();
+  }
+
+  Future<void> loadProvinces() async {
+    try {
+      final response =
+          await rootBundle.loadString('assets/api/thai_provinces.json');
+      final data = json.decode(response);
+      setState(() {
+        provinces = data;
+      });
+    } catch (e) {
+      print('Error loading provinces: $e');
+    }
+  }
+
+  Future<void> loadDistricts(String provinceId) async {
+    try {
+      final response =
+          await rootBundle.loadString('assets/api/thai_amphures.json');
+      final data = json.decode(response);
+      setState(() {
+        districts = data
+            .where((d) => d['province_id'].toString() == provinceId)
+            .toList();
+        selectedDistrict = null;
+        subdistricts = [];
+        selectedSubdistrict = null;
+      });
+    } catch (e) {
+      print('Error loading districts: $e');
+    }
+  }
+
+  Future<void> loadSubdistricts(String districtId) async {
+    try {
+      final response =
+          await rootBundle.loadString('assets/api/thai_tambons.json');
+      final data = json.decode(response);
+      setState(() {
+        subdistricts = data
+            .where((s) => s['amphure_id'].toString() == districtId)
+            .toList();
+        selectedSubdistrict = null;
+      });
+    } catch (e) {
+      print('Error loading subdistricts: $e');
+    }
   }
 
   Future<void> registerOfficer() async {
     if (!acceptTerms) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("กรุณายอมรับข้อตกลง")),
-      );
+      showSnack("กรุณายอมรับข้อตกลง");
       return;
     }
 
     if (usernameController.text.isEmpty ||
         emailController.text.isEmpty ||
         phoneController.text.isEmpty ||
-        provinceController.text.isEmpty ||
+        selectedProvince == null ||
+        selectedDistrict == null ||
+        selectedSubdistrict == null ||
         agencyController.text.isEmpty ||
         passwordController.text.isEmpty ||
         confirmPasswordController.text.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("กรุณากรอกข้อมูลให้ครบทุกช่อง")),
-      );
+      showSnack("กรุณากรอกข้อมูลให้ครบทุกช่อง");
       return;
     }
 
     if (passwordController.text != confirmPasswordController.text) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("รหัสผ่านไม่ตรงกัน")),
-      );
+      showSnack("รหัสผ่านไม่ตรงกัน");
       return;
     }
 
-    setState(() {
-      isLoading = true;
-    });
+    setState(() => isLoading = true);
 
-    final url = Uri.parse('http://localhost/flutter_fire/register_officer.php'); // แก้ URL ตามจริง
+    // แปลง selectedProvince (id) เป็น ชื่อจังหวัด
+    String provinceName = '';
+    if (selectedProvince != null) {
+      final prov = provinces.firstWhere(
+        (p) => p['id'].toString() == selectedProvince,
+        orElse: () => null,
+      );
+      provinceName = prov != null ? prov['name_th'] : '';
+    }
+
+    // แปลง selectedDistrict (id) เป็น ชื่ออำเภอ
+    String districtName = '';
+    if (selectedDistrict != null) {
+      final dist = districts.firstWhere(
+        (d) => d['id'].toString() == selectedDistrict,
+        orElse: () => null,
+      );
+      districtName = dist != null ? dist['name_th'] : '';
+    }
+
+    // selectedSubdistrict เก็บชื่ออยู่แล้ว เพราะตอนสร้าง dropdown ใช้ชื่อเป็น value
+    String subdistrictName = selectedSubdistrict ?? '';
+
+    final url = Uri.parse('http://localhost/flutter_fire/register_officer.php');
+
     try {
       final response = await http.post(
         url,
@@ -80,7 +148,9 @@ class _SignupOfficerPageState extends State<SignupOfficerPage> {
           'username': usernameController.text.trim(),
           'email': emailController.text.trim(),
           'phone': phoneController.text.trim(),
-          'province': provinceController.text.trim(),
+          'province': provinceName,
+          'district': districtName,
+          'subdistrict': subdistrictName,
           'agency': agencyController.text.trim(),
           'password': passwordController.text,
         },
@@ -88,25 +158,37 @@ class _SignupOfficerPageState extends State<SignupOfficerPage> {
 
       final data = json.decode(response.body);
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(data['message'] ?? 'เกิดข้อผิดพลาด')),
-      );
+      showSnack(data['message'] ?? 'เกิดข้อผิดพลาด');
 
       if (data['status'] == 'success') {
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (context) => const LoginPage()),
-        );
+        Future.delayed(const Duration(milliseconds: 500), () {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (context) => const LoginPage()),
+          );
+        });
       }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('เกิดข้อผิดพลาดในการเชื่อมต่อ')),
-      );
+      showSnack("เกิดข้อผิดพลาดในการเชื่อมต่อ: $e");
     }
 
-    setState(() {
-      isLoading = false;
-    });
+    setState(() => isLoading = false);
+  }
+
+  void showSnack(String message) {
+    ScaffoldMessenger.of(context)
+        .showSnackBar(SnackBar(content: Text(message)));
+  }
+
+  @override
+  void dispose() {
+    usernameController.dispose();
+    emailController.dispose();
+    phoneController.dispose();
+    agencyController.dispose();
+    passwordController.dispose();
+    confirmPasswordController.dispose();
+    super.dispose();
   }
 
   @override
@@ -116,7 +198,8 @@ class _SignupOfficerPageState extends State<SignupOfficerPage> {
       appBar: AppBar(
         title: const Text(
           'สมัครสมาชิก - เจ้าหน้าที่',
-          style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold),
+          style: TextStyle(
+              color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold),
         ),
         flexibleSpace: Container(
           decoration: BoxDecoration(
@@ -138,13 +221,52 @@ class _SignupOfficerPageState extends State<SignupOfficerPage> {
             inputField('ชื่อผู้ใช้งาน', controller: usernameController),
             inputField('อีเมล', controller: emailController),
             inputField('เบอร์โทรศัพท์', controller: phoneController),
-            inputField('จังหวัด', controller: provinceController),
+            dropdownField(
+              label: "จังหวัด",
+              value: selectedProvince,
+              items: provinces.map<DropdownMenuItem<String>>((prov) {
+                return DropdownMenuItem<String>(
+                  value: prov['id'].toString(),
+                  child: Text(prov['name_th']),
+                );
+              }).toList(),
+              onChanged: (value) {
+                setState(() => selectedProvince = value);
+                loadDistricts(value!);
+              },
+            ),
+            dropdownField(
+              label: "อำเภอ",
+              value: selectedDistrict,
+              items: districts.map<DropdownMenuItem<String>>((dist) {
+                return DropdownMenuItem<String>(
+                  value: dist['id'].toString(),
+                  child: Text(dist['name_th']),
+                );
+              }).toList(),
+              onChanged: (value) {
+                setState(() => selectedDistrict = value);
+                loadSubdistricts(value!);
+              },
+            ),
+            dropdownField(
+              label: "ตำบล",
+              value: selectedSubdistrict,
+              items: subdistricts.map<DropdownMenuItem<String>>((sub) {
+                return DropdownMenuItem<String>(
+                  value: sub['name_th'],
+                  child: Text(sub['name_th']),
+                );
+              }).toList(),
+              onChanged: (value) => setState(() => selectedSubdistrict = value),
+            ),
             inputField('หน่วยงานต้นสังกัด', controller: agencyController),
             const SizedBox(height: 10),
             header("รหัสผ่าน"),
-            inputField('รหัสผ่าน', obscureText: true, controller: passwordController),
-            inputField('ยืนยันรหัสผ่าน', obscureText: true, controller: confirmPasswordController),
-            const SizedBox(height: 10),
+            inputField('รหัสผ่าน',
+                obscureText: true, controller: passwordController),
+            inputField('ยืนยันรหัสผ่าน',
+                obscureText: true, controller: confirmPasswordController),
             Row(
               children: [
                 Checkbox(
@@ -171,7 +293,8 @@ class _SignupOfficerPageState extends State<SignupOfficerPage> {
               child: ElevatedButton(
                 onPressed: isLoading ? null : registerOfficer,
                 style: ElevatedButton.styleFrom(
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(30)),
                   padding: EdgeInsets.zero,
                   elevation: 4,
                 ),
@@ -190,7 +313,11 @@ class _SignupOfficerPageState extends State<SignupOfficerPage> {
                         ? const CircularProgressIndicator(color: Colors.white)
                         : const Text(
                             'สมัครสมาชิก',
-                            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white),
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white,
+                            ),
                           ),
                   ),
                 ),
@@ -207,7 +334,8 @@ class _SignupOfficerPageState extends State<SignupOfficerPage> {
       padding: const EdgeInsets.only(bottom: 12, top: 10),
       child: Text(
         title,
-        style: TextStyle(color: primaryBrown, fontSize: 16, fontWeight: FontWeight.w700),
+        style: TextStyle(
+            color: primaryBrown, fontSize: 16, fontWeight: FontWeight.w700),
       ),
     );
   }
@@ -225,7 +353,8 @@ class _SignupOfficerPageState extends State<SignupOfficerPage> {
           labelStyle: TextStyle(color: primaryBrown, fontSize: 14),
           filled: true,
           fillColor: lightBrown.withOpacity(0.5),
-          contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+          contentPadding:
+              const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
           border: OutlineInputBorder(
             borderRadius: BorderRadius.circular(12),
             borderSide: BorderSide(color: gradientEnd),
@@ -235,6 +364,36 @@ class _SignupOfficerPageState extends State<SignupOfficerPage> {
             borderSide: BorderSide(color: gradientStart, width: 2),
           ),
         ),
+      ),
+    );
+  }
+
+  Widget dropdownField({
+    required String label,
+    required String? value,
+    required List<DropdownMenuItem<String>> items,
+    required void Function(String?) onChanged,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16),
+      child: DropdownButtonFormField<String>(
+        value: value?.isEmpty == true ? null : value,
+        decoration: InputDecoration(
+          labelText: label,
+          labelStyle: TextStyle(color: primaryBrown),
+          filled: true,
+          fillColor: lightBrown.withOpacity(0.5),
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide(color: gradientEnd),
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide(color: gradientStart, width: 2),
+          ),
+        ),
+        items: items,
+        onChanged: onChanged,
       ),
     );
   }

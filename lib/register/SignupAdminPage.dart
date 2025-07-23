@@ -1,5 +1,6 @@
 import 'package:fireburn1_app/login.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart'; // สำหรับโหลด assets
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 
@@ -24,16 +25,68 @@ class _SignupAdminPageState extends State<SignupAdminPage> {
   final TextEditingController emailController = TextEditingController();
   final TextEditingController phoneController = TextEditingController();
   final TextEditingController passwordController = TextEditingController();
-  final TextEditingController confirmPasswordController = TextEditingController();
+  final TextEditingController confirmPasswordController =
+      TextEditingController();
+
+  List provinces = [];
+  List districts = [];
+  List subdistricts = [];
+
+  String? selectedProvince;
+  String? selectedDistrict;
+  String? selectedSubdistrict;
 
   @override
-  void dispose() {
-    usernameController.dispose();
-    emailController.dispose();
-    phoneController.dispose();
-    passwordController.dispose();
-    confirmPasswordController.dispose();
-    super.dispose();
+  void initState() {
+    super.initState();
+    loadProvinces();
+  }
+
+  Future<void> loadProvinces() async {
+    try {
+      final response =
+          await rootBundle.loadString('assets/api/thai_provinces.json');
+      final data = json.decode(response);
+      setState(() {
+        provinces = data;
+      });
+    } catch (e) {
+      print('Error loading provinces: $e');
+    }
+  }
+
+  Future<void> loadDistricts(String provinceId) async {
+    try {
+      final response =
+          await rootBundle.loadString('assets/api/thai_amphures.json');
+      final data = json.decode(response);
+      setState(() {
+        districts = data
+            .where((d) => d['province_id'].toString() == provinceId)
+            .toList();
+        selectedDistrict = null;
+        subdistricts = [];
+        selectedSubdistrict = null;
+      });
+    } catch (e) {
+      print('Error loading districts: $e');
+    }
+  }
+
+  Future<void> loadSubdistricts(String districtId) async {
+    try {
+      final response =
+          await rootBundle.loadString('assets/api/thai_tambons.json');
+      final data = json.decode(response);
+      setState(() {
+        subdistricts = data
+            .where((s) => s['amphure_id'].toString() == districtId)
+            .toList();
+        selectedSubdistrict = null;
+      });
+    } catch (e) {
+      print('Error loading subdistricts: $e');
+    }
   }
 
   void showSnack(String message) {
@@ -54,7 +107,10 @@ class _SignupAdminPageState extends State<SignupAdminPage> {
       return;
     }
 
-    if ([username, email, phone, password, confirmPassword].contains('')) {
+    if ([username, email, phone, password, confirmPassword].contains('') ||
+        selectedProvince == null ||
+        selectedDistrict == null ||
+        selectedSubdistrict == null) {
       showSnack("กรุณากรอกข้อมูลให้ครบทุกช่อง");
       return;
     }
@@ -66,12 +122,39 @@ class _SignupAdminPageState extends State<SignupAdminPage> {
 
     setState(() => isLoading = true);
 
+    // แปลง selectedProvince (id) เป็น ชื่อจังหวัด
+    String provinceName = '';
+    if (selectedProvince != null) {
+      final prov = provinces.firstWhere(
+        (p) => p['id'].toString() == selectedProvince,
+        orElse: () => null,
+      );
+      provinceName = prov != null ? prov['name_th'] : '';
+    }
+
+    // แปลง selectedDistrict (id) เป็น ชื่ออำเภอ
+    String districtName = '';
+    if (selectedDistrict != null) {
+      final dist = districts.firstWhere(
+        (d) => d['id'].toString() == selectedDistrict,
+        orElse: () => null,
+      );
+      districtName = dist != null ? dist['name_th'] : '';
+    }
+
+    // selectedSubdistrict เก็บชื่อแล้ว
+    String subdistrictName = selectedSubdistrict ?? '';
+
     try {
-      final url = Uri.parse('http://localhost/flutter_fire/register_admin.php'); // เปลี่ยน URL ให้ตรงกับเซิร์ฟเวอร์จริง
+      final url = Uri.parse(
+          'http://localhost/flutter_fire/register_admin.php'); // เปลี่ยน URL ให้ตรงกับเซิร์ฟเวอร์จริง
       final response = await http.post(url, body: {
         'username': username,
         'email': email,
         'phone': phone,
+        'province': provinceName,
+        'district': districtName,
+        'subdistrict': subdistrictName,
         'password': password,
       });
 
@@ -92,13 +175,24 @@ class _SignupAdminPageState extends State<SignupAdminPage> {
   }
 
   @override
+  void dispose() {
+    usernameController.dispose();
+    emailController.dispose();
+    phoneController.dispose();
+    passwordController.dispose();
+    confirmPasswordController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: backgroundColor,
       appBar: AppBar(
         title: const Text(
           'สมัครสมาชิก - Admin',
-          style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold),
+          style: TextStyle(
+              color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold),
         ),
         flexibleSpace: Container(
           decoration: BoxDecoration(
@@ -120,9 +214,53 @@ class _SignupAdminPageState extends State<SignupAdminPage> {
             inputField('Username', controller: usernameController),
             inputField('Email', controller: emailController),
             inputField('เบอร์โทรศัพท์', controller: phoneController),
+
+            // Dropdown จังหวัด-อำเภอ-ตำบล
+            dropdownField(
+              label: "จังหวัด",
+              value: selectedProvince,
+              items: provinces.map<DropdownMenuItem<String>>((prov) {
+                return DropdownMenuItem<String>(
+                  value: prov['id'].toString(),
+                  child: Text(prov['name_th']),
+                );
+              }).toList(),
+              onChanged: (value) {
+                setState(() => selectedProvince = value);
+                loadDistricts(value!);
+              },
+            ),
+            dropdownField(
+              label: "อำเภอ",
+              value: selectedDistrict,
+              items: districts.map<DropdownMenuItem<String>>((dist) {
+                return DropdownMenuItem<String>(
+                  value: dist['id'].toString(),
+                  child: Text(dist['name_th']),
+                );
+              }).toList(),
+              onChanged: (value) {
+                setState(() => selectedDistrict = value);
+                loadSubdistricts(value!);
+              },
+            ),
+            dropdownField(
+              label: "ตำบล",
+              value: selectedSubdistrict,
+              items: subdistricts.map<DropdownMenuItem<String>>((sub) {
+                return DropdownMenuItem<String>(
+                  value: sub['name_th'],
+                  child: Text(sub['name_th']),
+                );
+              }).toList(),
+              onChanged: (value) => setState(() => selectedSubdistrict = value),
+            ),
+
             sectionHeader("รหัสผ่าน"),
-            inputField('Password', obscureText: true, controller: passwordController),
-            inputField('Confirm Password', obscureText: true, controller: confirmPasswordController),
+            inputField('Password',
+                obscureText: true, controller: passwordController),
+            inputField('Confirm Password',
+                obscureText: true, controller: confirmPasswordController),
             const SizedBox(height: 10),
             Row(
               children: [
@@ -150,7 +288,8 @@ class _SignupAdminPageState extends State<SignupAdminPage> {
               child: ElevatedButton(
                 onPressed: isLoading ? null : handleSignup,
                 style: ElevatedButton.styleFrom(
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(30)),
                   padding: EdgeInsets.zero,
                   elevation: 4,
                 ),
@@ -169,7 +308,10 @@ class _SignupAdminPageState extends State<SignupAdminPage> {
                         ? const CircularProgressIndicator(color: Colors.white)
                         : const Text(
                             'สมัครสมาชิก',
-                            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white),
+                            style: TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white),
                           ),
                   ),
                 ),
@@ -186,7 +328,8 @@ class _SignupAdminPageState extends State<SignupAdminPage> {
       padding: const EdgeInsets.only(bottom: 12, top: 10),
       child: Text(
         title,
-        style: TextStyle(color: primaryBrown, fontSize: 16, fontWeight: FontWeight.w700),
+        style: TextStyle(
+            color: primaryBrown, fontSize: 16, fontWeight: FontWeight.w700),
       ),
     );
   }
@@ -204,7 +347,8 @@ class _SignupAdminPageState extends State<SignupAdminPage> {
           labelStyle: TextStyle(color: primaryBrown, fontSize: 14),
           filled: true,
           fillColor: lightBrown.withOpacity(0.5),
-          contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+          contentPadding:
+              const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
           border: OutlineInputBorder(
             borderRadius: BorderRadius.circular(12),
             borderSide: BorderSide(color: gradientEnd),
@@ -214,6 +358,36 @@ class _SignupAdminPageState extends State<SignupAdminPage> {
             borderSide: BorderSide(color: gradientStart, width: 2),
           ),
         ),
+      ),
+    );
+  }
+
+  Widget dropdownField({
+    required String label,
+    required String? value,
+    required List<DropdownMenuItem<String>> items,
+    required void Function(String?) onChanged,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16),
+      child: DropdownButtonFormField<String>(
+        value: value?.isEmpty == true ? null : value,
+        decoration: InputDecoration(
+          labelText: label,
+          labelStyle: TextStyle(color: primaryBrown),
+          filled: true,
+          fillColor: lightBrown.withOpacity(0.5),
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide(color: gradientEnd),
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide(color: gradientStart, width: 2),
+          ),
+        ),
+        items: items,
+        onChanged: onChanged,
       ),
     );
   }
