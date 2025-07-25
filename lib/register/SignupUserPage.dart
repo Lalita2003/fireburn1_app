@@ -1,8 +1,7 @@
 import 'package:fireburn1_app/login.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
-import 'dart:convert';
 import 'package:http/http.dart' as http;
+import 'dart:convert';
 
 class SignupUserPage extends StatefulWidget {
   const SignupUserPage({super.key});
@@ -45,48 +44,68 @@ class _SignupUserPageState extends State<SignupUserPage> {
 
   Future<void> loadProvinces() async {
     try {
-      final response =
-          await rootBundle.loadString('assets/api/thai_provinces.json');
-      final data = json.decode(response);
-      setState(() {
-        provinces = data;
-      });
+      final uri = Uri.parse("http://localhost/flutter_fire/provinces.php");
+      final res = await http.get(uri);
+      if (res.statusCode == 200) {
+        final responseData = json.decode(res.body);
+        if (responseData['status'] == 'success') {
+          setState(() {
+            provinces = responseData['data'];
+          });
+        } else {
+          showSnack("โหลดจังหวัดล้มเหลว: ${responseData['message']}");
+        }
+      } else {
+        showSnack("โหลดจังหวัดล้มเหลว: HTTP ${res.statusCode}");
+      }
     } catch (e) {
-      print('Error loading provinces: $e');
+      showSnack("โหลดจังหวัดล้มเหลว: $e");
     }
   }
 
   Future<void> loadDistricts(String provinceId) async {
     try {
-      final response =
-          await rootBundle.loadString('assets/api/thai_amphures.json');
-      final data = json.decode(response);
-      setState(() {
-        districts = data
-            .where((d) => d['province_id'].toString() == provinceId)
-            .toList();
-        selectedDistrict = null;
-        subdistricts = [];
-        selectedSubdistrict = null;
-      });
+      final uri = Uri.parse("http://localhost/flutter_fire/districts.php");
+      final res = await http.post(uri, body: {"province_id": provinceId});
+      if (res.statusCode == 200) {
+        final responseData = json.decode(res.body);
+        if (responseData['status'] == 'success') {
+          setState(() {
+            districts = responseData['data'];
+            selectedDistrict = null;
+            subdistricts = [];
+            selectedSubdistrict = null;
+          });
+        } else {
+          showSnack("โหลดอำเภอล้มเหลว: ${responseData['message']}");
+        }
+      } else {
+        showSnack("โหลดอำเภอล้มเหลว: HTTP ${res.statusCode}");
+      }
     } catch (e) {
-      print('Error loading districts: $e');
+      showSnack("โหลดอำเภอล้มเหลว: $e");
     }
   }
 
-  Future<void> loadSubdistricts(String districtId) async {
+  Future<void> loadSubdistricts(String amphureId) async {
     try {
-      final response =
-          await rootBundle.loadString('assets/api/thai_tambons.json');
-      final data = json.decode(response);
-      setState(() {
-        subdistricts = data
-            .where((s) => s['amphure_id'].toString() == districtId)
-            .toList();
-        selectedSubdistrict = null;
-      });
+      final uri = Uri.parse("http://localhost/flutter_fire/subdistricts.php");
+      final res = await http.post(uri, body: {"amphure_id": amphureId});
+      if (res.statusCode == 200) {
+        final responseData = json.decode(res.body);
+        if (responseData['status'] == 'success') {
+          setState(() {
+            subdistricts = responseData['data'];
+            selectedSubdistrict = null;
+          });
+        } else {
+          showSnack("โหลดตำบลล้มเหลว: ${responseData['message']}");
+        }
+      } else {
+        showSnack("โหลดตำบลล้มเหลว: HTTP ${res.statusCode}");
+      }
     } catch (e) {
-      print('Error loading subdistricts: $e');
+      showSnack("โหลดตำบลล้มเหลว: $e");
     }
   }
 
@@ -101,60 +120,49 @@ class _SignupUserPageState extends State<SignupUserPage> {
       return;
     }
 
+    if (selectedProvince == null ||
+        selectedDistrict == null ||
+        selectedSubdistrict == null) {
+      showSnack("กรุณาเลือกจังหวัด อำเภอ และตำบลให้ครบถ้วน");
+      return;
+    }
+
     setState(() => isLoading = true);
 
-    // แปลง selectedProvince (id) เป็น ชื่อจังหวัด
-    String provinceName = '';
-    if (selectedProvince != null) {
-      final prov = provinces.firstWhere(
-        (p) => p['id'].toString() == selectedProvince,
-        orElse: () => null,
-      );
-      provinceName = prov != null ? prov['name_th'] : '';
-    }
-
-    // แปลง selectedDistrict (id) เป็น ชื่ออำเภอ
-    String districtName = '';
-    if (selectedDistrict != null) {
-      final dist = districts.firstWhere(
-        (d) => d['id'].toString() == selectedDistrict,
-        orElse: () => null,
-      );
-      districtName = dist != null ? dist['name_th'] : '';
-    }
-
-    // selectedSubdistrict เก็บชื่ออยู่แล้ว เพราะตอนสร้าง dropdown ใช้ชื่อเป็น value
-    String subdistrictName = selectedSubdistrict ?? '';
-
-    final uri = Uri.parse('http://localhost/flutter_fire/register_user.php');
-
+    final uri = Uri.parse("http://localhost/flutter_fire/register_user.php");
     try {
       final response = await http.post(uri, body: {
-        "username": usernameController.text,
-        "email": emailController.text,
-        "phone": phoneController.text,
-        "village": villageController.text,
-        "province": provinceName, // ส่งชื่อจังหวัด
-        "district": districtName, // ส่งชื่ออำเภอ
-        "subdistrict": subdistrictName, // ส่งชื่อตำบล
+        "username": usernameController.text.trim(),
+        "email": emailController.text.trim(),
+        "phone": phoneController.text.trim(),
+        "village": villageController.text.trim(),
+        "province_id": selectedProvince!,
+        "district_id": selectedDistrict!,
+        "subdistrict_id": selectedSubdistrict!,
         "password": passwordController.text,
         "agency": "",
       });
 
-      final data = json.decode(response.body);
       setState(() => isLoading = false);
 
-      if (data['status'] == 'success') {
-        showSnack("สมัครสมาชิกสำเร็จ");
-        // ไปหน้า login.dart
-        Future.delayed(const Duration(milliseconds: 500), () {
-          Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(builder: (context) => const LoginPage()),
-          );
-        });
+      if (response.statusCode == 200) {
+        try {
+          final data = json.decode(response.body);
+
+          if (data['status'] == 'success') {
+            showSnack("สมัครสมาชิกสำเร็จ");
+            Future.delayed(const Duration(milliseconds: 500), () {
+              Navigator.pushReplacement(context,
+                  MaterialPageRoute(builder: (_) => const LoginPage()));
+            });
+          } else {
+            showSnack(data['message'] ?? "เกิดข้อผิดพลาดในการสมัครสมาชิก");
+          }
+        } catch (e) {
+          showSnack("เกิดข้อผิดพลาด: ข้อมูลไม่ใช่ JSON\n$e");
+        }
       } else {
-        showSnack(data['message'] ?? "เกิดข้อผิดพลาดในการสมัครสมาชิก");
+        showSnack("เกิดข้อผิดพลาด: HTTP ${response.statusCode}");
       }
     } catch (e) {
       setState(() => isLoading = false);
@@ -172,11 +180,7 @@ class _SignupUserPageState extends State<SignupUserPage> {
     return Scaffold(
       backgroundColor: backgroundColor,
       appBar: AppBar(
-        title: const Text(
-          'สมัครสมาชิก - ผู้ใช้ทั่วไป',
-          style: TextStyle(
-              color: Colors.white, fontWeight: FontWeight.bold, fontSize: 20),
-        ),
+        title: const Text('สมัครสมาชิก - ผู้ใช้ทั่วไป'),
         flexibleSpace: Container(
           decoration: BoxDecoration(
             gradient: LinearGradient(colors: [gradientStart, gradientEnd]),
@@ -185,59 +189,40 @@ class _SignupUserPageState extends State<SignupUserPage> {
         iconTheme: const IconThemeData(color: Colors.white),
       ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+        padding: const EdgeInsets.all(20),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             header("ข้อมูลผู้ใช้งาน"),
-            inputField('ชื่อผู้ใช้งาน', controller: usernameController),
-            inputField('อีเมล', controller: emailController),
-            inputField('เบอร์โทรศัพท์', controller: phoneController),
-            inputField('หมู่บ้าน', controller: villageController),
-            dropdownField(
-              label: "จังหวัด",
-              value: selectedProvince,
-              items: provinces.map<DropdownMenuItem<String>>((prov) {
-                return DropdownMenuItem<String>(
-                  value: prov['id'].toString(), // value เป็น id
-                  child: Text(prov['name_th']),
-                );
-              }).toList(),
-              onChanged: (value) {
-                setState(() => selectedProvince = value);
-                loadDistricts(value!);
-              },
-            ),
-            dropdownField(
-              label: "อำเภอ",
-              value: selectedDistrict,
-              items: districts.map<DropdownMenuItem<String>>((dist) {
-                return DropdownMenuItem<String>(
-                  value: dist['id'].toString(), // value เป็น id
-                  child: Text(dist['name_th']),
-                );
-              }).toList(),
-              onChanged: (value) {
-                setState(() => selectedDistrict = value);
-                loadSubdistricts(value!);
-              },
-            ),
-            dropdownField(
-              label: "ตำบล",
-              value: selectedSubdistrict,
-              items: subdistricts.map<DropdownMenuItem<String>>((sub) {
-                return DropdownMenuItem<String>(
-                  value: sub['name_th'], // value เป็นชื่อเลย
-                  child: Text(sub['name_th']),
-                );
-              }).toList(),
-              onChanged: (value) => setState(() => selectedSubdistrict = value),
-            ),
+            inputField("ชื่อผู้ใช้งาน", controller: usernameController),
+            inputField("อีเมล", controller: emailController),
+            inputField("เบอร์โทรศัพท์", controller: phoneController),
+            inputField("หมู่บ้าน", controller: villageController),
+            dropdownField("จังหวัด", selectedProvince, provinces, (val) {
+              setState(() {
+                selectedProvince = val;
+                selectedDistrict = null;
+                selectedSubdistrict = null;
+                districts = [];
+                subdistricts = [];
+              });
+              if (val != null) loadDistricts(val);
+            }),
+            dropdownField("อำเภอ", selectedDistrict, districts, (val) {
+              setState(() {
+                selectedDistrict = val;
+                selectedSubdistrict = null;
+                subdistricts = [];
+              });
+              if (val != null) loadSubdistricts(val);
+            }),
+            dropdownField("ตำบล", selectedSubdistrict, subdistricts, (val) {
+              setState(() => selectedSubdistrict = val);
+            }),
             header("รหัสผ่าน"),
-            inputField('รหัสผ่าน',
-                obscureText: true, controller: passwordController),
-            inputField('ยืนยันรหัสผ่าน',
-                obscureText: true, controller: confirmPasswordController),
+            inputField("รหัสผ่าน",
+                controller: passwordController, obscureText: true),
+            inputField("ยืนยันรหัสผ่าน",
+                controller: confirmPasswordController, obscureText: true),
             Row(
               children: [
                 Checkbox(
@@ -246,12 +231,8 @@ class _SignupUserPageState extends State<SignupUserPage> {
                   onChanged: (value) =>
                       setState(() => acceptTerms = value ?? false),
                 ),
-                Expanded(
-                  child: Text(
-                    "ฉันยอมรับข้อตกลงและนโยบายการใช้งาน",
-                    style: TextStyle(color: primaryBrown, fontSize: 14),
-                  ),
-                ),
+                const Expanded(
+                    child: Text("ฉันยอมรับข้อตกลงและนโยบายการใช้งาน")),
               ],
             ),
             const SizedBox(height: 20),
@@ -263,7 +244,6 @@ class _SignupUserPageState extends State<SignupUserPage> {
                 style: ElevatedButton.styleFrom(
                   shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(30)),
-                  elevation: 4,
                   padding: EdgeInsets.zero,
                 ),
                 child: Ink(
@@ -272,38 +252,33 @@ class _SignupUserPageState extends State<SignupUserPage> {
                         LinearGradient(colors: [gradientStart, gradientEnd]),
                     borderRadius: BorderRadius.circular(30),
                   ),
-                  child: Container(
-                    alignment: Alignment.center,
+                  child: Center(
                     child: isLoading
                         ? const CircularProgressIndicator(color: Colors.white)
-                        : const Text(
-                            'สมัครสมาชิก',
-                            style: TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.white),
-                          ),
+                        : const Text("สมัครสมาชิก",
+                            style:
+                                TextStyle(color: Colors.white, fontSize: 18)),
                   ),
                 ),
               ),
-            ),
+            )
           ],
         ),
       ),
     );
   }
 
-  Widget header(String title) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 10),
-      child: Text(title,
-          style: TextStyle(
-              color: primaryBrown, fontSize: 16, fontWeight: FontWeight.w700)),
-    );
-  }
+  Widget header(String text) => Padding(
+        padding: const EdgeInsets.symmetric(vertical: 8),
+        child: Text(text,
+            style: TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 16,
+                color: primaryBrown)),
+      );
 
   Widget inputField(String label,
-      {bool obscureText = false, TextEditingController? controller}) {
+      {TextEditingController? controller, bool obscureText = false}) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 16),
       child: TextField(
@@ -311,49 +286,33 @@ class _SignupUserPageState extends State<SignupUserPage> {
         obscureText: obscureText,
         decoration: InputDecoration(
           labelText: label,
-          labelStyle: TextStyle(color: primaryBrown),
           filled: true,
           fillColor: lightBrown.withOpacity(0.5),
-          contentPadding:
-              const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
-            borderSide: BorderSide(color: gradientEnd),
-          ),
-          focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
-            borderSide: BorderSide(color: gradientStart, width: 2),
-          ),
+          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
         ),
       ),
     );
   }
 
-  Widget dropdownField({
-    required String label,
-    required String? value,
-    required List<DropdownMenuItem<String>> items,
-    required void Function(String?) onChanged,
-  }) {
+  Widget dropdownField(String label, String? value, List list,
+      void Function(String?) onChanged) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 16),
       child: DropdownButtonFormField<String>(
-        value: value?.isEmpty == true ? null : value,
+        value:
+            list.any((item) => item['id'].toString() == value) ? value : null,
         decoration: InputDecoration(
           labelText: label,
-          labelStyle: TextStyle(color: primaryBrown),
           filled: true,
           fillColor: lightBrown.withOpacity(0.5),
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
-            borderSide: BorderSide(color: gradientEnd),
-          ),
-          focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
-            borderSide: BorderSide(color: gradientStart, width: 2),
-          ),
+          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
         ),
-        items: items,
+        items: list.map<DropdownMenuItem<String>>((item) {
+          return DropdownMenuItem<String>(
+            value: item['id'].toString(),
+            child: Text(item['name_th']),
+          );
+        }).toList(),
         onChanged: onChanged,
       ),
     );
