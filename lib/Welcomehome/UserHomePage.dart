@@ -1,11 +1,18 @@
-import 'package:fireburn1_app/Select_user/LocationPage.dart';
-import 'package:fireburn1_app/Select_user/burn_request_page.dart';
+import 'package:fireburn1_app/Select_user/weather_forecast_page.dart';
 import 'package:flutter/material.dart';
+import 'package:fireburn1_app/Select_user/LocationPage.dart'; // แก้เป็น path จริงของคุณ
+import 'package:fireburn1_app/Select_user/burn_request_page.dart';
 
-
-
-class UserHomePage extends StatelessWidget {
+class UserHomePage extends StatefulWidget {
   const UserHomePage({super.key});
+
+  @override
+  State<UserHomePage> createState() => _UserHomePageState();
+}
+
+class _UserHomePageState extends State<UserHomePage> {
+  double? selectedLatitude;
+  double? selectedLongitude;
 
   @override
   Widget build(BuildContext context) {
@@ -130,11 +137,20 @@ class UserHomePage extends StatelessWidget {
                     ),
                     const SizedBox(height: 12),
                     ElevatedButton.icon(
-                      onPressed: () {
-                        Navigator.push(
+                      onPressed: () async {
+                        // ไปหน้าเลือกตำแหน่ง และรอค่าพิกัดกลับมา
+                        final result = await Navigator.push(
                           context,
-                          MaterialPageRoute(builder: (context) => const SelectLocationPage()),
+                          MaterialPageRoute(
+                              builder: (context) => const SelectLocationPage()),
                         );
+
+                        if (result != null && result is Map<String, double>) {
+                          setState(() {
+                            selectedLatitude = result['latitude'];
+                            selectedLongitude = result['longitude'];
+                          });
+                        }
                       },
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Colors.white,
@@ -175,12 +191,18 @@ class UserHomePage extends StatelessWidget {
                 crossAxisSpacing: 6,
                 mainAxisSpacing: 6,
                 children: [
-                  _buildCategory(Icons.local_fire_department_outlined, 'การขออนุญาตเผา', context),
-                  _buildCategory(Icons.map_outlined, 'แผนที่พื้นที่ควบคุม', context),
-                  _buildCategory(Icons.warning_amber_outlined, 'แจ้งเตือนฉุกเฉิน', context),
-                  _buildCategory(Icons.cloud_outlined, 'สถานะค่าฝุ่น PM2.5', context),
-                  _buildCategory(Icons.description_outlined, 'รายงานการเผา', context),
-                  _buildCategory(Icons.settings_outlined, 'การตั้งค่า', context),
+                  _buildCategory(Icons.cloud_outlined,
+                      'เช็คค่าฝุ่น PM2.5 ก่อนขอเผา', context),
+                  _buildCategory(Icons.local_fire_department_outlined,
+                      'การขออนุญาตเผา', context),
+                  _buildCategory(
+                      Icons.map_outlined, 'แผนที่พื้นที่ควบคุม', context),
+                  _buildCategory(Icons.warning_amber_outlined,
+                      'แจ้งเตือนฉุกเฉิน', context),
+                  _buildCategory(
+                      Icons.description_outlined, 'รายงานการเผา', context),
+                  _buildCategory(
+                      Icons.settings_outlined, 'การตั้งค่า', context),
                 ],
               ),
             ),
@@ -228,50 +250,82 @@ class UserHomePage extends StatelessWidget {
     );
   }
 
- Widget _buildCategory(IconData icon, String title, BuildContext context) {
-  return Card(
-    elevation: 0.5,
-    shape: RoundedRectangleBorder(
-      borderRadius: BorderRadius.circular(12),
-      side: const BorderSide(color: Color(0xFFEF6C00), width: 0.5),
-    ),
-    child: InkWell(
-      onTap: () {
-        if (title == 'การขออนุญาตเผา') {
-          Navigator.push(
-            context,
-            MaterialPageRoute(builder: (context) => const BurnRequestPage()),
-          );
-        } else {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('คุณเลือก: $title')),
-          );
-        }
-      },
-      child: Container(
-        padding: const EdgeInsets.all(6.0),
-        decoration: BoxDecoration(
-          color: const Color(0xFFFFF8E1),
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(icon, color: const Color(0xFFEF6C00), size: 26),
-            const SizedBox(height: 4),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 2.0),
-              child: Text(title,
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(
-                      fontSize: 10,
-                      fontWeight: FontWeight.w600,
-                      color: Color(0xFF212121))),
-            ),
-          ],
+  Widget _buildCategory(IconData icon, String title, BuildContext context) {
+    return Card(
+      elevation: 0.5,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: const BorderSide(color: Color(0xFFEF6C00), width: 0.5),
+      ),
+      child: InkWell(
+        onTap: () {
+          if (title == 'การขออนุญาตเผา') {
+            if (selectedLatitude != null && selectedLongitude != null) {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => BurnRequestPage(
+                    latitude: selectedLatitude!,
+                    longitude: selectedLongitude!,
+                  ),
+                ),
+              );
+            } else {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('กรุณาเลือกตำแหน่งก่อนขออนุญาตเผา'),
+                  backgroundColor: Colors.black,
+                ),
+              );
+            }
+          } else if (title == 'เช็คค่าฝุ่น PM2.5 ก่อนขอเผา') {
+            if (selectedLatitude != null && selectedLongitude != null) {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => WeatherForecastPage(
+                    latitude: selectedLatitude!,
+                    longitude: selectedLongitude!,
+                  ),
+                ),
+              );
+            } else {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                    content:
+                        Text('กรุณาเลือกตำแหน่งก่อนใช้งานเช็คค่าฝุ่น PM2.5')),
+              );
+            }
+          } else {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('คุณเลือก: $title')),
+            );
+          }
+        },
+        child: Container(
+          padding: const EdgeInsets.all(6.0),
+          decoration: BoxDecoration(
+            color: const Color(0xFFFFF8E1),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(icon, color: const Color(0xFFEF6C00), size: 26),
+              const SizedBox(height: 4),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 2.0),
+                child: Text(title,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w600,
+                        color: Color(0xFF212121))),
+              ),
+            ],
+          ),
         ),
       ),
-    ),
-  );
-}
+    );
+  }
 }

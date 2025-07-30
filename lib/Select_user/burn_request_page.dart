@@ -2,7 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
 class BurnRequestPage extends StatefulWidget {
-  const BurnRequestPage({super.key});
+  final double? latitude;
+  final double? longitude;
+
+  const BurnRequestPage({super.key, this.latitude, this.longitude});
 
   @override
   State<BurnRequestPage> createState() => _BurnRequestPageState();
@@ -21,6 +24,14 @@ class _BurnRequestPageState extends State<BurnRequestPage> {
   TimeOfDay? timeTo;
   String? purpose;
   String? cropType;
+
+  @override
+  void initState() {
+    super.initState();
+    // รับค่าพิกัดเริ่มต้นจาก widget
+    latitude = widget.latitude;
+    longitude = widget.longitude;
+  }
 
   String formatTime(TimeOfDay? time) {
     if (time == null) return '';
@@ -106,7 +117,8 @@ class _BurnRequestPageState extends State<BurnRequestPage> {
 
               // ชื่อพื้นที่
               TextFormField(
-                decoration: buildInputDecoration('ชื่อพื้นที่ (เช่น ไร่อ้อยข้างบ้าน)'),
+                decoration:
+                    buildInputDecoration('ชื่อพื้นที่ (เช่น ไร่อ้อยข้างบ้าน)'),
                 validator: (val) =>
                     val == null || val.isEmpty ? 'กรุณากรอกชื่อพื้นที่' : null,
                 onSaved: (val) => areaName = val,
@@ -119,7 +131,8 @@ class _BurnRequestPageState extends State<BurnRequestPage> {
                 keyboardType: TextInputType.number,
                 validator: (val) {
                   final d = double.tryParse(val ?? '');
-                  if (d == null || d <= 0) return 'กรุณากรอกขนาดพื้นที่ให้ถูกต้อง';
+                  if (d == null || d <= 0)
+                    return 'กรุณากรอกขนาดพื้นที่ให้ถูกต้อง';
                   return null;
                 },
                 onSaved: (val) => areaSize = double.parse(val!),
@@ -128,6 +141,7 @@ class _BurnRequestPageState extends State<BurnRequestPage> {
 
               // ละติจูด
               TextFormField(
+                initialValue: widget.latitude?.toString() ?? '',
                 decoration: buildInputDecoration('ละติจูด (Latitude)'),
                 keyboardType: TextInputType.number,
                 validator: (val) =>
@@ -138,6 +152,7 @@ class _BurnRequestPageState extends State<BurnRequestPage> {
 
               // ลองจิจูด
               TextFormField(
+                initialValue: widget.longitude?.toString() ?? '',
                 decoration: buildInputDecoration('ลองจิจูด (Longitude)'),
                 keyboardType: TextInputType.number,
                 validator: (val) =>
@@ -157,8 +172,9 @@ class _BurnRequestPageState extends State<BurnRequestPage> {
                           ? ''
                           : DateFormat('yyyy-MM-dd').format(requestDate!),
                     ),
-                    validator: (val) =>
-                        requestDate == null ? 'กรุณาเลือกวันที่ต้องการเผา' : null,
+                    validator: (val) => requestDate == null
+                        ? 'กรุณาเลือกวันที่ต้องการเผา'
+                        : null,
                   ),
                 ),
               ),
