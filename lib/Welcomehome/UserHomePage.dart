@@ -1,7 +1,9 @@
-import 'package:fireburn1_app/Select_user/weather_forecast_page.dart';
 import 'package:flutter/material.dart';
-import 'package:fireburn1_app/Select_user/LocationPage.dart'; // แก้เป็น path จริงของคุณ
+import 'package:fireburn1_app/Select_user/weather_forecast_page.dart';
+import 'package:fireburn1_app/Select_user/LocationPage.dart';
 import 'package:fireburn1_app/Select_user/burn_request_page.dart';
+import 'package:fireburn1_app/Select_user/request_list_page.dart';
+import 'package:fireburn1_app/Select_user/user_profile_page.dart';
 
 class UserHomePage extends StatefulWidget {
   const UserHomePage({super.key});
@@ -14,8 +16,54 @@ class _UserHomePageState extends State<UserHomePage> {
   double? selectedLatitude;
   double? selectedLongitude;
 
+  int _currentIndex = 0;
+
   @override
   Widget build(BuildContext context) {
+    final List<Widget> _pages = [
+      _buildHomeContent(),
+      const RequestListPage(),
+      const UserProfilePage(),
+    ];
+
+    return Scaffold(
+      backgroundColor: Colors.white,
+      body: _pages[_currentIndex],
+      bottomNavigationBar: Container(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            colors: [Color(0xFFDD6B00), Color(0xFFC14400)],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+        ),
+        child: BottomNavigationBar(
+          currentIndex: _currentIndex,
+          onTap: (index) => setState(() => _currentIndex = index),
+          selectedItemColor: Colors.white,
+          unselectedItemColor: Colors.white70,
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          items: const [
+            BottomNavigationBarItem(
+              icon: Icon(Icons.home_outlined),
+              label: 'หน้าหลัก',
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.list_alt_outlined),
+              label: 'รายการ',
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.account_circle_outlined),
+              label: 'โปรไฟล์',
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildHomeContent() {
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
@@ -25,10 +73,7 @@ class _UserHomePageState extends State<UserHomePage> {
         flexibleSpace: Container(
           decoration: const BoxDecoration(
             gradient: LinearGradient(
-              colors: [
-                Color(0xFFDD6B00),
-                Color(0xFFC14400),
-              ],
+              colors: [Color(0xFFDD6B00), Color(0xFFC14400)],
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
             ),
@@ -37,21 +82,13 @@ class _UserHomePageState extends State<UserHomePage> {
         title: const Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              'สวัสดี, ผู้ใช้ทั่วไป',
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 22,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            Text(
-              'พร้อมตรวจสอบการเผาแล้ว!',
-              style: TextStyle(
-                color: Colors.white70,
-                fontSize: 14,
-              ),
-            ),
+            Text('สวัสดี, ผู้ใช้ทั่วไป',
+                style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 22,
+                    fontWeight: FontWeight.bold)),
+            Text('พร้อมตรวจสอบการเผาแล้ว!',
+                style: TextStyle(color: Colors.white70, fontSize: 14)),
           ],
         ),
         actions: [
@@ -88,10 +125,8 @@ class _UserHomePageState extends State<UserHomePage> {
                   isDense: true,
                   contentPadding: const EdgeInsets.symmetric(vertical: 8),
                   hintText: 'ค้นหา...',
-                  hintStyle: const TextStyle(
-                    color: Color(0xFF757575),
-                    fontSize: 13,
-                  ),
+                  hintStyle:
+                      const TextStyle(color: Color(0xFF757575), fontSize: 13),
                   border: InputBorder.none,
                   icon: Icon(Icons.search,
                       color: const Color(0xFFEF6C00).withOpacity(0.8),
@@ -100,21 +135,16 @@ class _UserHomePageState extends State<UserHomePage> {
               ),
             ),
             const SizedBox(height: 16),
-
-            // PM2.5 Section
+            // PM2.5 Card
             Card(
               elevation: 3,
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(18),
-              ),
+                  borderRadius: BorderRadius.circular(18)),
               child: Container(
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
                   gradient: const LinearGradient(
-                    colors: [
-                      Color(0xFFFFB300),
-                      Color(0xFFEF6C00),
-                    ],
+                    colors: [Color(0xFFFFB300), Color(0xFFEF6C00)],
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
                   ),
@@ -123,13 +153,11 @@ class _UserHomePageState extends State<UserHomePage> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text(
-                      '💡 ตรวจสอบค่าฝุ่น PM2.5 ก่อนทำการเผา',
-                      style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white),
-                    ),
+                    const Text('💡 ตรวจสอบค่าฝุ่น PM2.5 ก่อนทำการเผา',
+                        style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white)),
                     const SizedBox(height: 6),
                     const Text(
                       'กรุณาเลือกตำแหน่งพื้นที่ที่ต้องการวิเคราะห์ เพื่อดูค่าฝุ่น PM2.5',
@@ -138,7 +166,6 @@ class _UserHomePageState extends State<UserHomePage> {
                     const SizedBox(height: 12),
                     ElevatedButton.icon(
                       onPressed: () async {
-                        // ไปหน้าเลือกตำแหน่ง และรอค่าพิกัดกลับมา
                         final result = await Navigator.push(
                           context,
                           MaterialPageRoute(
@@ -163,25 +190,20 @@ class _UserHomePageState extends State<UserHomePage> {
                         elevation: 2,
                       ),
                       icon: const Icon(Icons.map_outlined, size: 18),
-                      label: const Text(
-                        'เลือกตำแหน่งเพื่อดูค่าฝุ่น PM2.5',
-                        style: TextStyle(
-                            fontSize: 13, fontWeight: FontWeight.w600),
-                      ),
+                      label: const Text('เลือกตำแหน่งเพื่อดูค่าฝุ่น PM2.5',
+                          style: TextStyle(
+                              fontSize: 13, fontWeight: FontWeight.w600)),
                     ),
                   ],
                 ),
               ),
             ),
-
             const SizedBox(height: 20),
-            const Text(
-              'หมวดหมู่',
-              style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 18,
-                  color: Color(0xFF212121)),
-            ),
+            const Text('หมวดหมู่',
+                style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 18,
+                    color: Color(0xFF212121))),
             const SizedBox(height: 8),
             Expanded(
               child: GridView.count(
@@ -210,43 +232,6 @@ class _UserHomePageState extends State<UserHomePage> {
           ],
         ),
       ),
-      bottomNavigationBar: Container(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            colors: [
-              Color(0xFFDD6B00),
-              Color(0xFFC14400),
-            ],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-          ),
-        ),
-        child: Theme(
-          data: Theme.of(context).copyWith(
-            canvasColor: Colors.transparent,
-            primaryColor: Colors.white,
-            textTheme: Theme.of(context).textTheme.copyWith(
-                  bodySmall: const TextStyle(color: Colors.white),
-                ),
-          ),
-          child: BottomNavigationBar(
-            selectedItemColor: Colors.white,
-            unselectedItemColor: Colors.white70,
-            backgroundColor: Colors.transparent,
-            elevation: 0,
-            currentIndex: 0,
-            type: BottomNavigationBarType.fixed,
-            items: const [
-              BottomNavigationBarItem(
-                  icon: Icon(Icons.home_outlined), label: 'หน้าหลัก'),
-              BottomNavigationBarItem(
-                  icon: Icon(Icons.list_alt_outlined), label: 'รายการ'),
-              BottomNavigationBarItem(
-                  icon: Icon(Icons.account_circle_outlined), label: 'โปรไฟล์'),
-            ],
-          ),
-        ),
-      ),
     );
   }
 
@@ -271,12 +256,8 @@ class _UserHomePageState extends State<UserHomePage> {
                 ),
               );
             } else {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('กรุณาเลือกตำแหน่งก่อนขออนุญาตเผา'),
-                  backgroundColor: Colors.black,
-                ),
-              );
+              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+                  content: Text('กรุณาเลือกตำแหน่งก่อนขออนุญาตเผา')));
             }
           } else if (title == 'เช็คค่าฝุ่น PM2.5 ก่อนขอเผา') {
             if (selectedLatitude != null && selectedLongitude != null) {
@@ -290,11 +271,8 @@ class _UserHomePageState extends State<UserHomePage> {
                 ),
               );
             } else {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                    content:
-                        Text('กรุณาเลือกตำแหน่งก่อนใช้งานเช็คค่าฝุ่น PM2.5')),
-              );
+              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+                  content: Text('กรุณาเลือกตำแหน่งก่อนดูค่าฝุ่น PM2.5')));
             }
           } else {
             ScaffoldMessenger.of(context).showSnackBar(
