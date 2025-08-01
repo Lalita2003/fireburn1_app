@@ -6,7 +6,9 @@ import 'package:fireburn1_app/Select_user/request_list_page.dart';
 import 'package:fireburn1_app/Select_user/user_profile_page.dart';
 
 class UserHomePage extends StatefulWidget {
-  const UserHomePage({super.key});
+  final int userId; // รับ userId มาที่นี่
+
+  const UserHomePage({super.key, required this.userId});
 
   @override
   State<UserHomePage> createState() => _UserHomePageState();
@@ -23,7 +25,7 @@ class _UserHomePageState extends State<UserHomePage> {
     final List<Widget> _pages = [
       _buildHomeContent(),
       const RequestListPage(),
-      const UserProfilePage(),
+      UserProfilePage(userId: widget.userId), // ส่ง userId ไปหน้าโปรไฟล์
     ];
 
     return Scaffold(

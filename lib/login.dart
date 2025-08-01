@@ -1,12 +1,15 @@
+import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
+
+// Import หน้า Home ของแต่ละบทบาท
 import 'package:fireburn1_app/Welcomehome/AdminHomePage.dart';
 import 'package:fireburn1_app/Welcomehome/OfficerHomePage.dart';
 import 'package:fireburn1_app/Welcomehome/UserHomePage.dart';
 import 'package:fireburn1_app/Welcomehome/VillageHeadHomePage.dart';
+
+// Import หน้าเลือกสมัครสมาชิก
 import 'package:fireburn1_app/register/SelectRole.dart';
-import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
-import 'package:http/http.dart' as http;
-import 'dart:convert';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -17,8 +20,6 @@ class LoginPage extends StatefulWidget {
 
 class _LoginPageState extends State<LoginPage> {
   final Color primaryBrown = const Color(0xFF5D4037);
-  final Color backgroundColor = Colors.white; // พื้นหลังสีขาว
-
   final TextEditingController emailController = TextEditingController();
   final TextEditingController passwordController = TextEditingController();
 
@@ -44,7 +45,8 @@ class _LoginPageState extends State<LoginPage> {
     });
 
     try {
-      final uri = Uri.parse('http://localhost/flutter_fire/login.php');
+      final uri = Uri.parse(
+          'http://localhost/flutter_fire/login.php'); // เปลี่ยนเป็น URL จริงของเซิร์ฟเวอร์คุณ
       final response = await http.post(uri, body: {
         'email': email,
         'password': password,
@@ -55,18 +57,19 @@ class _LoginPageState extends State<LoginPage> {
       if (data['status'] == 'success') {
         final user = data['user'];
         final role = user['role'];
+        final int userId = int.parse(user['id'].toString());
 
         showSnack("เข้าสู่ระบบสำเร็จ: ยินดีต้อนรับ ${user['username']}");
 
         Widget homePage;
         if (role == 'user') {
-          homePage = const UserHomePage();
+          homePage = UserHomePage(userId: userId);
         } else if (role == 'village_head') {
-          homePage = const VillageHeadHomePage();
+          homePage = VillageHeadHomePage(userId: userId);
         } else if (role == 'officer') {
-          homePage = const OfficerHomePage();
+          homePage = OfficerHomePage();
         } else if (role == 'admin') {
-          homePage = const AdminHomePage();
+          homePage = AdminHomePage();
         } else {
           showSnack("บทบาทไม่ถูกต้อง");
           return;
@@ -137,7 +140,7 @@ class _LoginPageState extends State<LoginPage> {
             ),
           ),
 
-          // เนื้อหา LoginPage อยู่ด้านบน
+          // เนื้อหา LoginPage
           SafeArea(
             child: Container(
               width: double.infinity,
@@ -150,7 +153,7 @@ class _LoginPageState extends State<LoginPage> {
                       begin: Alignment.centerLeft,
                       end: Alignment.centerRight,
                     ).createShader(bounds),
-                    child: Text(
+                    child: const Text(
                       "Login",
                       style: TextStyle(
                         fontSize: 36,
@@ -166,7 +169,7 @@ class _LoginPageState extends State<LoginPage> {
                       begin: Alignment.centerLeft,
                       end: Alignment.centerRight,
                     ).createShader(bounds),
-                    child: Text(
+                    child: const Text(
                       "Login to your burning account",
                       style: TextStyle(
                         fontSize: 16,
@@ -179,15 +182,25 @@ class _LoginPageState extends State<LoginPage> {
                     padding: const EdgeInsets.symmetric(horizontal: 40),
                     child: Column(
                       children: [
-                        inputField(label: "Email", controller: emailController, primaryBrown: primaryBrown),
-                        inputField(label: "Password", obscureText: true, controller: passwordController, primaryBrown: primaryBrown),
+                        inputField(
+                            label: "Email",
+                            controller: emailController,
+                            primaryBrown: primaryBrown),
+                        inputField(
+                            label: "Password",
+                            obscureText: true,
+                            controller: passwordController,
+                            primaryBrown: primaryBrown),
                         const SizedBox(height: 30),
                         Container(
                           width: double.infinity,
                           height: 50,
                           decoration: BoxDecoration(
                             gradient: const LinearGradient(
-                              colors: [Color.fromARGB(255, 208, 146, 1), Color(0xFFEF6C00)],
+                              colors: [
+                                Color.fromARGB(255, 208, 146, 1),
+                                Color(0xFFEF6C00)
+                              ],
                               begin: Alignment.topLeft,
                               end: Alignment.bottomRight,
                             ),
@@ -204,10 +217,14 @@ class _LoginPageState extends State<LoginPage> {
                             ),
                             onPressed: isLoading ? null : loginUser,
                             child: isLoading
-                                ? const CircularProgressIndicator(color: Colors.white)
+                                ? const CircularProgressIndicator(
+                                    color: Colors.white)
                                 : const Text(
                                     "Login",
-                                    style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 18),
+                                    style: TextStyle(
+                                        color: Colors.white,
+                                        fontWeight: FontWeight.w600,
+                                        fontSize: 18),
                                   ),
                           ),
                         ),
@@ -217,13 +234,19 @@ class _LoginPageState extends State<LoginPage> {
                           children: [
                             Text(
                               "ไม่มีบัญชีใช่ไหม?",
-                              style: TextStyle(color: primaryBrown.withOpacity(0.7)),
+                              style: TextStyle(
+                                  color: primaryBrown.withOpacity(0.7)),
                             ),
                             GestureDetector(
-                              onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => SelectRolePage())),
+                              onTap: () => Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                      builder: (_) => SelectRolePage())),
                               child: Text(
                                 " สมัครสมาชิก",
-                                style: TextStyle(color: primaryBrown, fontWeight: FontWeight.bold),
+                                style: TextStyle(
+                                    color: primaryBrown,
+                                    fontWeight: FontWeight.bold),
                               ),
                             )
                           ],
