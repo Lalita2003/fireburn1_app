@@ -1,3 +1,5 @@
+
+import 'package:fireburn1_app/Select_user/BurnHistoryPage.dart' show BurnHistoryPage;
 import 'package:flutter/material.dart';
 import 'package:fireburn1_app/Select_user/weather_forecast_page.dart';
 import 'package:fireburn1_app/Select_user/LocationPage.dart';
@@ -220,13 +222,14 @@ class _UserHomePageState extends State<UserHomePage> {
                   _buildCategory(Icons.local_fire_department_outlined,
                       'การขออนุญาตเผา', context),
                   _buildCategory(
-                      Icons.map_outlined, 'แผนที่พื้นที่ควบคุม', context),
-                  _buildCategory(Icons.warning_amber_outlined,
-                      'แจ้งเตือนฉุกเฉิน', context),
-                  _buildCategory(
-                      Icons.description_outlined, 'รายงานการเผา', context),
-                  _buildCategory(
-                      Icons.settings_outlined, 'การตั้งค่า', context),
+                      Icons.description_outlined, 'ประวัติการขอเผา', context),
+
+                  // _buildCategory(
+                  //     Icons.map_outlined, 'แผนที่พื้นที่ควบคุม', context),
+                  // _buildCategory(Icons.warning_amber_outlined,
+                  //     'แจ้งเตือนฉุกเฉิน', context),
+                  // _buildCategory(
+                  //    Icons.settings_outlined, 'การตั้งค่า', context),
                 ],
               ),
             ),
@@ -254,6 +257,7 @@ class _UserHomePageState extends State<UserHomePage> {
                   builder: (context) => BurnRequestPage(
                     latitude: selectedLatitude!,
                     longitude: selectedLongitude!,
+                    userId: widget.userId,
                   ),
                 ),
               );
@@ -276,6 +280,13 @@ class _UserHomePageState extends State<UserHomePage> {
               ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
                   content: Text('กรุณาเลือกตำแหน่งก่อนดูค่าฝุ่น PM2.5')));
             }
+          } else if (title == 'ประวัติการขอเผา') {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => BurnHistoryPage(userId: widget.userId),
+              ),
+            );
           } else {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(content: Text('คุณเลือก: $title')),

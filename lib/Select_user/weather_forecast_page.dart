@@ -22,8 +22,9 @@ class _WeatherForecastPageState extends State<WeatherForecastPage> {
   Map<String, List<HourlyWeather>> groupedForecast = {};
   double rai = 0.0;
   String errorMsg = '';
-
   late TextEditingController raiController;
+
+  Set<DateTime> selectedHours = {};
 
   // ------------ Box Model Functions ------------
   double raiToAcre(double rai) => rai * 0.39525691699605;
@@ -46,7 +47,7 @@ class _WeatherForecastPageState extends State<WeatherForecastPage> {
   String classifyPM25(double pm25) {
     if (pm25 <= 15) return "🔵 ดีมาก";
     if (pm25 <= 25) return "🟢 ดี";
-    if (pm25 <= 37) return "🟡 ปานกลาง";
+    if (pm25 <= 37.5) return "🟡 ปานกลาง";
     if (pm25 <= 50) return "🟠 เริ่มมีผลกระทบต่อสุขภาพ";
     return "🔴 มีผลกระทบต่อสุขภาพ";
   }
@@ -54,7 +55,7 @@ class _WeatherForecastPageState extends State<WeatherForecastPage> {
   // ------------ Fetch Weather Data ------------
   Future<List<HourlyWeather>> fetchWeatherData(double lat, double lon) async {
     final url = Uri.parse(
-        'https://api.open-meteo.com/v1/forecast?latitude=$lat&longitude=$lon&hourly=wind_speed_10m,boundary_layer_height&timezone=auto');
+        'https://api.open-meteo.com/v1/forecast?latitude=$lat&longitude=$lon&hourly=wind_speed_10m,boundary_layer_height,temperature_2m,relativehumidity_2m&timezone=auto');
     final res = await http.get(url);
     if (res.statusCode != 200) {
       throw Exception("ไม่สามารถดึงข้อมูลจาก Open-Meteo API");
@@ -67,13 +68,20 @@ class _WeatherForecastPageState extends State<WeatherForecastPage> {
     final mixingHeights = List<double>.from(
         (data['hourly']['boundary_layer_height'] as List)
             .map((e) => e.toDouble()));
+    final temperatures = List<double>.from(
+        (data['hourly']['temperature_2m'] as List).map((e) => e.toDouble()));
+    final humidities = List<double>.from(
+        (data['hourly']['relativehumidity_2m'] as List)
+            .map((e) => e.toDouble()));
 
     List<HourlyWeather> list = [];
     for (int i = 0; i < times.length; i++) {
       list.add(HourlyWeather(
           time: DateTime.parse(times[i]),
           windSpeed: windSpeeds[i],
-          mixingHeight: mixingHeights[i]));
+          mixingHeight: mixingHeights[i],
+          temperature: temperatures[i],
+          humidity: humidities[i]));
     }
     return list;
   }
@@ -89,6 +97,7 @@ class _WeatherForecastPageState extends State<WeatherForecastPage> {
     setState(() {
       isLoading = true;
       errorMsg = '';
+      selectedHours.clear();
     });
 
     try {
@@ -158,6 +167,7 @@ class _WeatherForecastPageState extends State<WeatherForecastPage> {
                 0: FixedColumnWidth(60),
                 1: FlexColumnWidth(1.5),
                 2: FlexColumnWidth(1.5),
+                3: FixedColumnWidth(60),
               },
               children: [
                 const TableRow(
@@ -180,6 +190,13 @@ class _WeatherForecastPageState extends State<WeatherForecastPage> {
                     Padding(
                       padding: EdgeInsets.all(8),
                       child: Text('สถานะ',
+                          style: TextStyle(
+                              fontWeight: FontWeight.bold, color: Colors.white),
+                          textAlign: TextAlign.center),
+                    ),
+                    Padding(
+                      padding: EdgeInsets.all(8),
+                      child: Text('เลือก',
                           style: TextStyle(
                               fontWeight: FontWeight.bold, color: Colors.white),
                           textAlign: TextAlign.center),
@@ -211,6 +228,20 @@ class _WeatherForecastPageState extends State<WeatherForecastPage> {
                         padding: const EdgeInsets.symmetric(vertical: 6),
                         child: Text(status, textAlign: TextAlign.center),
                       ),
+                      Checkbox(
+                        value: selectedHours.contains(item.time),
+                        activeColor: Colors.black,
+                        checkColor: Colors.white,
+                        onChanged: (val) {
+                          setState(() {
+                            if (val == true) {
+                              selectedHours.add(item.time);
+                            } else {
+                              selectedHours.remove(item.time);
+                            }
+                          });
+                        },
+                      ),
                     ],
                   );
                 }).toList(),
@@ -220,6 +251,62 @@ class _WeatherForecastPageState extends State<WeatherForecastPage> {
         ),
       ),
     );
+  }
+
+  /// 👉 บันทึกข้อมูลไปที่ PHP API
+  void saveSelectedHours() async {
+    if (selectedHours.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("⚠️ กรุณาเลือกชั่วโมงก่อนบันทึก")),
+      );
+      return;
+    }
+
+    List<Map<String, dynamic>> dataToSave = [];
+
+    for (var date in groupedForecast.keys) {
+      for (var hour in groupedForecast[date]!) {
+        if (selectedHours.contains(hour.time)) {
+          dataToSave.add(hour.toMap(rai));
+        }
+      }
+    }
+
+    try {
+      final url =
+          Uri.parse("http://localhost/flutter_fire/save_weather_log.php");
+
+      final response = await http.post(
+        url,
+        headers: {"Content-Type": "application/json"},
+        body: jsonEncode({"weather_logs": dataToSave}),
+      );
+
+      if (response.statusCode == 200) {
+        final res = jsonDecode(response.body);
+        if (res["status"] == "success") {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+                content: Text(
+                    "✅ บันทึกข้อมูลเรียบร้อย (${dataToSave.length} ชั่วโมง)")),
+          );
+          // ✅ กลับไปหน้า UserHomePage
+          Navigator.pop(context);
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text("❌ บันทึกไม่สำเร็จ: ${res['message']}")),
+          );
+        }
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("⚠️ เซิร์ฟเวอร์ตอบกลับผิดพลาด")),
+        );
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("⚠️ เกิดข้อผิดพลาด: $e")),
+      );
+    }
   }
 
   @override
@@ -333,6 +420,22 @@ class _WeatherForecastPageState extends State<WeatherForecastPage> {
                                   .toList(),
                             ),
             ),
+            if (groupedForecast.isNotEmpty)
+              ElevatedButton.icon(
+                onPressed: saveSelectedHours,
+                icon: const Icon(
+                  Icons.save,
+                  color: Colors.white,
+                ),
+                label: const Text(
+                  "บันทึกชั่วโมงที่เลือก",
+                  style: TextStyle(color: Colors.white),
+                ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xffe59513),
+                  minimumSize: const Size.fromHeight(45),
+                ),
+              )
           ],
         ),
       ),
@@ -344,10 +447,39 @@ class HourlyWeather {
   final DateTime time;
   final double windSpeed;
   final double mixingHeight;
+  final double temperature;
+  final double humidity;
 
   HourlyWeather({
     required this.time,
     required this.windSpeed,
     required this.mixingHeight,
+    this.temperature = 0,
+    this.humidity = 0,
   });
+
+  double pm25(double rai) {
+    if (windSpeed == 0 || mixingHeight == 0) return 0;
+    final acre = rai * 0.39525691699605;
+    final areaM2 = acre * 4046.85642;
+    final P = (4.0e7 * acre / 24) / 3600;
+    final W = sqrt(areaM2) * (sqrt(2) / 2);
+    final b = mixingHeight;
+    return P / (windSpeed * W * b) * 1000;
+  }
+
+  Map<String, dynamic> toMap(double rai) {
+    return {
+      "fetch_time": DateTime.now().toIso8601String(),
+      "forecast_date":
+          "${time.year}-${time.month.toString().padLeft(2, '0')}-${time.day.toString().padLeft(2, '0')}",
+      "forecast_hour": "${time.hour.toString().padLeft(2, '0')}:00:00",
+      "temperature": temperature,
+      "humidity": humidity,
+      "wind_speed": windSpeed,
+      "boundary_height": mixingHeight,
+      "pm25_model":
+          double.parse(pm25(rai).toStringAsFixed(2)), // ✅ ปัด 2 ตำแหน่ง
+    };
+  }
 }

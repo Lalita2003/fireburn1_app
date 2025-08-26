@@ -1,11 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
 
 class BurnRequestPage extends StatefulWidget {
   final double? latitude;
   final double? longitude;
+  final int userId; // ✅ รับ userId ของผู้ใช้
 
-  const BurnRequestPage({super.key, this.latitude, this.longitude});
+  const BurnRequestPage(
+      {super.key, this.latitude, this.longitude, required this.userId});
 
   @override
   State<BurnRequestPage> createState() => _BurnRequestPageState();
@@ -28,7 +32,6 @@ class _BurnRequestPageState extends State<BurnRequestPage> {
   @override
   void initState() {
     super.initState();
-    // รับค่าพิกัดเริ่มต้นจาก widget
     latitude = widget.latitude;
     longitude = widget.longitude;
   }
@@ -89,6 +92,79 @@ class _BurnRequestPageState extends State<BurnRequestPage> {
         borderSide: BorderSide(color: Color(0xFFDD6B00), width: 2),
       ),
     );
+  }
+
+  // ✅ ฟังก์ชันบันทึกข้อมูลลง DB ผ่าน API
+  Future<void> _submitRequest() async {
+    if (!_formKey.currentState!.validate()) return;
+    _formKey.currentState!.save();
+
+    final body = {
+      "user_id": widget.userId,
+      "area_name": areaName,
+      "area_size": areaSize,
+      "location_lat": latitude,
+      "location_lng": longitude,
+      "request_date": DateFormat('yyyy-MM-dd').format(requestDate!),
+      "time_slot_from":
+          "${timeFrom!.hour.toString().padLeft(2, '0')}:${timeFrom!.minute.toString().padLeft(2, '0')}:00",
+      "time_slot_to":
+          "${timeTo!.hour.toString().padLeft(2, '0')}:${timeTo!.minute.toString().padLeft(2, '0')}:00",
+      "purpose": purpose,
+      "crop_type": cropType,
+      "status": "pending", // ✅ ค่าเริ่มต้น
+    };
+
+    try {
+      final res = await http.post(
+        Uri.parse(
+            "http://localhost/flutter_fire/burn_request.php"), // ✅ แก้เป็น API จริง
+        headers: {"Content-Type": "application/json"},
+        body: jsonEncode(body),
+      );
+      print('Status code: ${res.statusCode}');
+      print('Body: ${res.body}');
+
+      if (res.statusCode == 200 || res.statusCode == 201) {
+        final data = jsonDecode(res.body);
+        final burnRequestId = data['id'];
+
+        // อัปเดต weather_logs สำหรับ forecast_date ที่ตรงกัน
+        try {
+          final updateRes = await http.post(
+            Uri.parse("http://localhost/flutter_fire/save_weather_log.php"),
+            headers: {"Content-Type": "application/json"},
+            body: jsonEncode({
+              "burn_request_id": burnRequestId,
+              "forecast_date": DateFormat('yyyy-MM-dd').format(requestDate!)
+            }),
+          );
+          print(
+              'Update weather_logs status: ${updateRes.statusCode}, body: ${updateRes.body}');
+        } catch (e) {
+          print('Error updating weather_logs: $e');
+        }
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+              content: Text("✅ ส่งคำขอสำเร็จ"), backgroundColor: Colors.green),
+        );
+        Navigator.pop(context, true); // กลับไปหน้าเดิม + refresh
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+              content: Text("❌ เกิดข้อผิดพลาด: ${res.body}"),
+              backgroundColor: Colors.red),
+        );
+      }
+    } catch (e) {
+      print('Error: $e'); // ✅ ปริ้น error
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+            content: Text("❌ ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์: $e"),
+            backgroundColor: Colors.red),
+      );
+    }
   }
 
   @override
@@ -212,7 +288,7 @@ class _BurnRequestPageState extends State<BurnRequestPage> {
               ),
               const SizedBox(height: 12),
 
-              // เหตุผลในการเผา
+              // เหตุผล
               TextFormField(
                 decoration: buildInputDecoration('เหตุผลในการเผา'),
                 validator: (val) =>
@@ -235,7 +311,7 @@ class _BurnRequestPageState extends State<BurnRequestPage> {
                 width: double.infinity,
                 height: 50,
                 child: ElevatedButton.icon(
-                  icon: const Icon(Icons.fireplace),
+                  icon: const Icon(Icons.fireplace, color: Colors.white),
                   label: const Text(
                     'ส่งคำขอ',
                     style: TextStyle(fontWeight: FontWeight.bold),
@@ -247,18 +323,7 @@ class _BurnRequestPageState extends State<BurnRequestPage> {
                       borderRadius: BorderRadius.circular(12),
                     ),
                   ),
-                  onPressed: () {
-                    if (_formKey.currentState!.validate()) {
-                      _formKey.currentState!.save();
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('✅ ส่งคำขอสำเร็จ'),
-                          backgroundColor: Colors.green,
-                        ),
-                      );
-                      // TODO: ส่งข้อมูลไปยัง API หรือฐานข้อมูล
-                    }
-                  },
+                  onPressed: _submitRequest, // ✅ กดแล้วส่งไป DB
                 ),
               ),
             ],
