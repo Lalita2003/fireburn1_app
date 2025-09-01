@@ -1,10 +1,10 @@
-
-import 'package:fireburn1_app/Select_user/BurnHistoryPage.dart' show BurnHistoryPage;
+import 'package:fireburn1_app/Select_user/BurnHistoryPage.dart';
+import 'package:fireburn1_app/Select_user/NotificationPage.dart';
 import 'package:flutter/material.dart';
 import 'package:fireburn1_app/Select_user/weather_forecast_page.dart';
 import 'package:fireburn1_app/Select_user/LocationPage.dart';
 import 'package:fireburn1_app/Select_user/burn_request_page.dart';
-import 'package:fireburn1_app/Select_user/request_list_page.dart';
+
 import 'package:fireburn1_app/Select_user/user_profile_page.dart';
 
 class UserHomePage extends StatefulWidget {
@@ -26,7 +26,7 @@ class _UserHomePageState extends State<UserHomePage> {
   Widget build(BuildContext context) {
     final List<Widget> _pages = [
       _buildHomeContent(),
-      const RequestListPage(),
+      NotificationPage(userId: widget.userId),
       UserProfilePage(userId: widget.userId), // ส่ง userId ไปหน้าโปรไฟล์
     ];
 
@@ -54,8 +54,8 @@ class _UserHomePageState extends State<UserHomePage> {
               label: 'หน้าหลัก',
             ),
             BottomNavigationBarItem(
-              icon: Icon(Icons.list_alt_outlined),
-              label: 'รายการ',
+              icon: Icon(Icons.notifications_none_outlined),
+              label: 'การแจ้งเตือน',
             ),
             BottomNavigationBarItem(
               icon: Icon(Icons.account_circle_outlined),
@@ -97,8 +97,7 @@ class _UserHomePageState extends State<UserHomePage> {
         ),
         actions: [
           IconButton(
-            icon: const Icon(Icons.notifications_none_outlined,
-                color: Colors.white, size: 24),
+            icon: const Icon(Icons.more_vert, color: Colors.white, size: 24),
             onPressed: () {},
           ),
           const SizedBox(width: 8),
