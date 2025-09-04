@@ -23,17 +23,30 @@ class _BurnHistoryPageState extends State<BurnHistoryPage> {
     fetchBurnRequests();
   }
 
+  /// ดึงข้อมูลจาก API และกรองเฉพาะ userId ของผู้ใช้ที่ Login
   Future<void> fetchBurnRequests() async {
+    setState(() {
+      isLoading = true;
+      errorMessage = null;
+    });
+
     try {
-      final uri = Uri.parse(
-          'http://localhost/flutter_fire/burn_request.php?user_id=${widget.userId}');
+      final uri = Uri.parse('http://localhost/flutter_fire/burn_request.php');
       final response = await http.get(uri);
 
       if (response.statusCode == 200) {
         final List<dynamic> data = json.decode(response.body);
+
+        // กรองข้อมูลให้เหลือเฉพาะ userId ของผู้ใช้ปัจจุบัน
+        final filteredData = data
+            .where((item) =>
+                item['user_id'] != null &&
+                item['user_id'].toString() == widget.userId.toString())
+            .map((item) => item as Map<String, dynamic>)
+            .toList();
+
         setState(() {
-          burnRequests =
-              data.map((item) => item as Map<String, dynamic>).toList();
+          burnRequests = filteredData;
           isLoading = false;
         });
       } else {
@@ -45,12 +58,13 @@ class _BurnHistoryPageState extends State<BurnHistoryPage> {
       }
     } catch (e) {
       setState(() {
-        errorMessage = e.toString();
+        errorMessage = 'เกิดข้อผิดพลาด: $e';
         isLoading = false;
       });
     }
   }
 
+  /// กำหนดสีตามสถานะ
   Color _getStatusColor(String? status) {
     switch (status?.toLowerCase()) {
       case 'approved':
@@ -65,6 +79,7 @@ class _BurnHistoryPageState extends State<BurnHistoryPage> {
     }
   }
 
+  /// จัดรูปแบบเวลา
   String _formatTime(String? time) {
     if (time == null || time.isEmpty) return '-';
     try {
@@ -75,6 +90,7 @@ class _BurnHistoryPageState extends State<BurnHistoryPage> {
     }
   }
 
+  /// จัดรูปแบบตัวเลขทศนิยม
   String _formatDecimal(dynamic value) {
     if (value == null) return '-';
     final d = double.tryParse(value.toString());
@@ -92,73 +108,80 @@ class _BurnHistoryPageState extends State<BurnHistoryPage> {
       body: isLoading
           ? const Center(child: CircularProgressIndicator())
           : errorMessage != null
-              ? Center(child: Text('เกิดข้อผิดพลาด: $errorMessage'))
+              ? Center(child: Text(errorMessage!))
               : burnRequests.isEmpty
                   ? const Center(child: Text('ไม่มีประวัติการขอเผา'))
-                  : ListView.builder(
-                      padding: const EdgeInsets.all(16),
-                      itemCount: burnRequests.length,
-                      itemBuilder: (context, index) {
-                        final req = burnRequests[index];
-                        return Card(
-                          margin: const EdgeInsets.symmetric(vertical: 8),
-                          shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12)),
-                          elevation: 3,
-                          child: Padding(
-                            padding: const EdgeInsets.all(12.0),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                // ชื่อพื้นที่และสถานะ
-                                Row(
-                                  mainAxisAlignment:
-                                      MainAxisAlignment.spaceBetween,
-                                  children: [
-                                    Text(
-                                      req['area_name'] ?? '-',
-                                      style: const TextStyle(
-                                          fontWeight: FontWeight.bold,
-                                          fontSize: 16),
-                                    ),
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(
-                                          horizontal: 8, vertical: 4),
-                                      decoration: BoxDecoration(
-                                        color: _getStatusColor(req['status']),
-                                        borderRadius: BorderRadius.circular(8),
-                                      ),
-                                      child: Text(
-                                        req['status']
-                                                ?.toString()
-                                                .toUpperCase() ??
-                                            '-',
+                  : RefreshIndicator(
+                      onRefresh: fetchBurnRequests,
+                      child: ListView.builder(
+                        padding: const EdgeInsets.all(16),
+                        itemCount: burnRequests.length,
+                        itemBuilder: (context, index) {
+                          final req = burnRequests[index];
+                          return Card(
+                            margin: const EdgeInsets.symmetric(vertical: 8),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            elevation: 3,
+                            child: Padding(
+                              padding: const EdgeInsets.all(12.0),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  // ชื่อพื้นที่และสถานะ
+                                  Row(
+                                    mainAxisAlignment:
+                                        MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      Text(
+                                        req['area_name'] ?? '-',
                                         style: const TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 16,
+                                        ),
+                                      ),
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(
+                                            horizontal: 8, vertical: 4),
+                                        decoration: BoxDecoration(
+                                          color: _getStatusColor(req['status']),
+                                          borderRadius:
+                                              BorderRadius.circular(8),
+                                        ),
+                                        child: Text(
+                                          req['status']
+                                                  ?.toString()
+                                                  .toUpperCase() ??
+                                              '-',
+                                          style: const TextStyle(
                                             color: Colors.white,
                                             fontWeight: FontWeight.bold,
-                                            fontSize: 12),
+                                            fontSize: 12,
+                                          ),
+                                        ),
                                       ),
-                                    ),
-                                  ],
-                                ),
-                                const SizedBox(height: 6),
-                                Text(
-                                    'ขนาดพื้นที่: ${_formatDecimal(req['area_size'])} ไร่'),
-                                Text(
-                                    'ละติจูด: ${_formatDecimal(req['location_lat'])}, ลองจิจูด: ${_formatDecimal(req['location_lng'])}'),
-                                const SizedBox(height: 6),
-                                Text(
-                                    'วันที่ต้องการเผา: ${req['request_date'] ?? '-'}'),
-                                Text(
-                                    'เวลา: ${_formatTime(req['time_slot_from'])} - ${_formatTime(req['time_slot_to'])}'),
-                                const SizedBox(height: 6),
-                                Text('ประเภทพืช: ${req['crop_type'] ?? '-'}'),
-                                Text('เหตุผล: ${req['purpose'] ?? '-'}'),
-                              ],
+                                    ],
+                                  ),
+                                  const SizedBox(height: 6),
+                                  Text(
+                                      'ขนาดพื้นที่: ${_formatDecimal(req['area_size'])} ไร่'),
+                                  Text(
+                                      'ละติจูด: ${_formatDecimal(req['location_lat'])}, ลองจิจูด: ${_formatDecimal(req['location_lng'])}'),
+                                  const SizedBox(height: 6),
+                                  Text(
+                                      'วันที่ต้องการเผา: ${req['request_date'] ?? '-'}'),
+                                  Text(
+                                      'เวลา: ${_formatTime(req['time_slot_from'])} - ${_formatTime(req['time_slot_to'])}'),
+                                  const SizedBox(height: 6),
+                                  Text('ประเภทพืช: ${req['crop_type'] ?? '-'}'),
+                                  Text('เหตุผล: ${req['purpose'] ?? '-'}'),
+                                ],
+                              ),
                             ),
-                          ),
-                        );
-                      },
+                          );
+                        },
+                      ),
                     ),
     );
   }

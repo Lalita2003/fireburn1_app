@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import 'BurnHistoryPage.dart'; // ตรวจสอบ path ให้ถูกต้อง
 
 class NotificationPage extends StatefulWidget {
   final int userId;
@@ -16,55 +17,73 @@ class _NotificationPageState extends State<NotificationPage> {
   bool isLoading = true;
   String? errorMessage;
 
-  final String baseUrl =
-      "http://localhost/flutter_fire/"; // เปลี่ยนเป็น IP เครื่อง Dev
+  final String baseUrl = "http://localhost/flutter_fire/";
 
   @override
   void initState() {
     super.initState();
-    fetchRequestsAndNotify();
+    fetchBurnRequestsAndNotify();
   }
 
-  // Fetch คำขอเผาและสร้าง Notification
-  Future<void> fetchRequestsAndNotify() async {
+  // ดึง burn requests และสร้าง/อัปเดต notification
+  Future<void> fetchBurnRequestsAndNotify() async {
     try {
-      final response = await http.get(Uri.parse("${baseUrl}burn_request.php"));
-      if (response.statusCode == 200) {
-        final List data = json.decode(response.body);
+      final burnResp = await http.get(Uri.parse("${baseUrl}burn_request.php"));
+      if (burnResp.statusCode == 200) {
+        final dynamic burnJson = json.decode(burnResp.body);
+        List<dynamic> burnData = [];
 
-        notifications = data.map<Map<String, dynamic>>((request) {
-          return {
-            'id': 0, // จะอัปเดตเป็น id จริงหลังจากบันทึก Notification
-            'area_name': request['area_name'] ?? '-',
-            'area_size': request['area_size'] ?? '-',
-            'crop_type': request['crop_type'] ?? '-',
-            'request_date': request['request_date'] ?? '-',
-            'status': request['status'] ?? 'pending',
-            'is_read': 0,
-          };
-        }).toList();
-
-        // ส่ง Notification สำหรับแต่ละรายการ และอัปเดต id จริง
-        for (var i = 0; i < notifications.length; i++) {
-          var request = notifications[i];
-          int? notifId = await addNotification(
-            userId: widget.userId,
-            title: "คำขอเผาในพื้นที่ ${request['area_name']}",
-            message:
-                "คำขอเผาขนาด ${request['area_size']} ไร่ | พืช: ${request['crop_type']}",
-          );
-
-          if (notifId != null) {
-            notifications[i]['id'] = notifId; // อัปเดต id จริงจาก DB
+        if (burnJson is List) {
+          burnData = burnJson;
+        } else if (burnJson is Map) {
+          if (burnJson['data'] is List) {
+            burnData = burnJson['data'];
+          } else {
+            burnData = [burnJson];
           }
         }
 
-        setState(() {
-          isLoading = false;
-        });
+        final filteredBurnData = burnData.where((item) {
+          if (item is Map<String, dynamic> && item.containsKey('user_id')) {
+            return item['user_id'].toString() == widget.userId.toString();
+          }
+          return false;
+        }).toList();
+
+        for (var requestRaw in filteredBurnData) {
+          final Map<String, dynamic> request =
+              Map<String, dynamic>.from(requestRaw);
+          String title = "คำขอเผาในพื้นที่ ${request['area_name']}";
+          String message =
+              "คำขอเผาขนาด ${request['area_size']} ไร่ | พืช: ${request['crop_type']}";
+
+          final checkResp = await http.get(Uri.parse(
+              "${baseUrl}check_notification.php?user_id=${widget.userId}&title=${Uri.encodeComponent(title)}&message=${Uri.encodeComponent(message)}"));
+
+          bool exists = false;
+          if (checkResp.statusCode == 200) {
+            final checkData = json.decode(checkResp.body);
+            if (checkData is Map) exists = checkData['exists'] ?? false;
+          }
+
+          if (!exists) {
+            await http.post(
+              Uri.parse("${baseUrl}notifications.php"),
+              body: {
+                'user_id': widget.userId.toString(),
+                'title': title,
+                'message': message,
+                'is_read': '0',
+              },
+            );
+          }
+        }
+
+        await fetchNotifications();
       } else {
         setState(() {
-          errorMessage = "โหลดข้อมูลไม่สำเร็จ (code ${response.statusCode})";
+          errorMessage =
+              "โหลดข้อมูลคำขอไม่สำเร็จ (code ${burnResp.statusCode})";
           isLoading = false;
         });
       }
@@ -76,48 +95,66 @@ class _NotificationPageState extends State<NotificationPage> {
     }
   }
 
-  // ส่ง Notification พร้อมเช็กซ้ำ และรับ id ของ Notification จริง
-  Future<int?> addNotification({
-    required int userId,
-    required String title,
-    required String message,
-  }) async {
+  // ดึง notifications ของผู้ใช้
+  Future<void> fetchNotifications() async {
     try {
-      // เช็กว่ามี Notification ซ้ำหรือไม่
-      final checkResponse = await http.get(Uri.parse(
-          "${baseUrl}check_notification.php?user_id=$userId&title=${Uri.encodeComponent(title)}&message=${Uri.encodeComponent(message)}"));
-
-      if (checkResponse.statusCode == 200) {
-        final data = json.decode(checkResponse.body);
-        bool exists = data['exists'] ?? false;
-        if (exists) return null;
-      }
-
-      // เพิ่ม Notification ลงฐานข้อมูล
-      final response = await http.post(
-        Uri.parse("${baseUrl}notifications.php"),
-        body: {
-          'user_id': userId.toString(),
-          'title': title,
-          'message': message,
-          'is_read': '0',
-        },
+      final response = await http.get(
+        Uri.parse("${baseUrl}get_notifications.php?user_id=${widget.userId}"),
       );
 
       if (response.statusCode == 200) {
-        final respData = json.decode(response.body);
-        return respData['notification_id']; // รับ id ของ Notification
+        final dynamic jsonResp = json.decode(response.body);
+        List<dynamic> data = [];
+
+        if (jsonResp is List) {
+          data = jsonResp;
+        } else if (jsonResp is Map) {
+          if (jsonResp['data'] is List)
+            data = jsonResp['data'];
+          else if (jsonResp['notifications'] is List)
+            data = jsonResp['notifications'];
+          else
+            data = [jsonResp];
+        }
+
+        final filteredData = data.where((item) {
+          if (item is Map<String, dynamic> && item.containsKey('user_id')) {
+            return item['user_id'].toString() == widget.userId.toString();
+          }
+          return false;
+        }).toList();
+
+        notifications = filteredData.map<Map<String, dynamic>>((itemRaw) {
+          final Map<String, dynamic> item = Map<String, dynamic>.from(itemRaw);
+          return {
+            'id': item['id'],
+            'title': item['title'],
+            'message': item['message'],
+            'is_read': item['is_read'] ?? 0,
+            'status': item['status']?.toString() ?? 'pending',
+            'user_id': item['user_id'],
+          };
+        }).toList();
+
+        setState(() {
+          isLoading = false;
+        });
       } else {
-        print("บันทึก notification ไม่สำเร็จ: ${response.body}");
-        return null;
+        setState(() {
+          errorMessage =
+              "โหลดการแจ้งเตือนไม่สำเร็จ (code ${response.statusCode})";
+          isLoading = false;
+        });
       }
     } catch (e) {
-      print("เกิดข้อผิดพลาดตอนบันทึก notification: $e");
-      return null;
+      setState(() {
+        errorMessage = "เกิดข้อผิดพลาด: $e";
+        isLoading = false;
+      });
     }
   }
 
-  // ฟังก์ชันอัปเดต is_read
+  // mark notification as read
   Future<void> markAsRead(int notificationId) async {
     try {
       final response = await http.post(
@@ -125,24 +162,23 @@ class _NotificationPageState extends State<NotificationPage> {
         body: {'id': notificationId.toString()},
       );
       if (response.statusCode == 200) {
-        print("Marked as read: $notificationId");
-      } else {
-        print("Failed to mark as read: ${response.body}");
+        setState(() {
+          final index =
+              notifications.indexWhere((n) => n['id'] == notificationId);
+          if (index != -1) notifications[index]['is_read'] = 1;
+        });
       }
-    } catch (e) {
-      print("Error marking notification as read: $e");
-    }
+    } catch (e) {}
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        automaticallyImplyLeading: false,
-        title: const Text('การแจ้งเตือน'),
+        title: const Text("การแจ้งเตือน"),
         centerTitle: true,
         backgroundColor: const Color(0xFFEF6C00),
-        foregroundColor: Colors.white,
+        automaticallyImplyLeading: false, // ลบไอคอน Back
       ),
       body: isLoading
           ? const Center(child: CircularProgressIndicator())
@@ -154,17 +190,20 @@ class _NotificationPageState extends State<NotificationPage> {
                       padding: const EdgeInsets.all(12),
                       itemCount: notifications.length,
                       itemBuilder: (context, index) {
-                        final notification = notifications[index];
-                        final isRead = notification['is_read'] == 1;
+                        final n = notifications[index];
+                        final isRead = n['is_read'] == 1;
 
                         return InkWell(
                           onTap: () async {
-                            if (!isRead) {
-                              await markAsRead(notification['id']);
-                              setState(() {
-                                notifications[index]['is_read'] = 1;
-                              });
-                            }
+                            await markAsRead(n['id']);
+                            // push แบบสามารถย้อนกลับมา NotificationPage ได้
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) =>
+                                    BurnHistoryPage(userId: widget.userId),
+                              ),
+                            );
                           },
                           child: Container(
                             margin: const EdgeInsets.symmetric(vertical: 8),
@@ -178,65 +217,39 @@ class _NotificationPageState extends State<NotificationPage> {
                                   blurRadius: 6,
                                   spreadRadius: 2,
                                   offset: const Offset(0, 3),
-                                ),
+                                )
                               ],
                             ),
-                            child: Row(
+                            child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                if (!isRead)
-                                  Container(
-                                    width: 10,
-                                    height: 10,
-                                    margin:
-                                        const EdgeInsets.only(top: 6, right: 8),
-                                    decoration: const BoxDecoration(
-                                      color: Colors.orange,
-                                      shape: BoxShape.circle,
-                                    ),
-                                  )
-                                else
-                                  const SizedBox(width: 18),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        "คำขอเผาในพื้นที่ ${notification['area_name']}",
-                                        style: TextStyle(
-                                          fontWeight: isRead
-                                              ? FontWeight.normal
-                                              : FontWeight.bold,
-                                          fontSize: 16,
-                                          color: isRead
-                                              ? Colors.grey[700]
-                                              : Colors.black,
-                                        ),
-                                      ),
-                                      const SizedBox(height: 4),
-                                      Text(
-                                        "วันที่: ${notification['request_date']}\n"
-                                        "ขนาด: ${notification['area_size']} ไร่ | "
-                                        "พืช: ${notification['crop_type']}",
-                                        style: TextStyle(
-                                          fontSize: 13,
-                                          color: isRead
-                                              ? Colors.grey
-                                              : Colors.black,
-                                        ),
-                                      ),
-                                      const SizedBox(height: 4),
-                                      Text(
-                                        "สถานะ: ${_statusText(notification['status'])}",
-                                        style: TextStyle(
-                                          fontSize: 13,
-                                          fontWeight: FontWeight.bold,
-                                          color: _statusColor(
-                                              notification['status']),
-                                        ),
-                                      ),
-                                    ],
+                                Text(
+                                  n['title'] ?? '-',
+                                  style: TextStyle(
+                                    fontWeight: isRead
+                                        ? FontWeight.normal
+                                        : FontWeight.bold,
+                                    fontSize: 16,
+                                    color: isRead
+                                        ? Colors.grey[700]
+                                        : Colors.black,
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  n['message'] ?? '-',
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    color: isRead ? Colors.grey : Colors.black,
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  "สถานะ: ${_statusText(n['status'])}",
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.bold,
+                                    color: _statusColor(n['status']),
                                   ),
                                 ),
                               ],

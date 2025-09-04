@@ -68,6 +68,7 @@ class _UserProfilePageState extends State<UserProfilePage> {
 
     return Scaffold(
       appBar: AppBar(
+        automaticallyImplyLeading: false,
         title: const Text('โปรไฟล์ผู้ใช้'),
         backgroundColor: Colors.orange.shade700,
         actions: [
