@@ -25,12 +25,12 @@ class _WeatherForecastPageState extends State<WeatherForecastPage> {
   late TextEditingController raiController;
 
   Set<DateTime> selectedHours = {};
+  Set<DateTime> disabledHours = {};
 
   // ------------ Box Model Functions ------------
   double raiToAcre(double rai) => rai * 0.39525691699605;
   double acreToAreaM2(double acre) => acre * 4046.85642;
-  double calculateEmissionRate(double acre) =>
-      (4.0e7 * acre / 24) / 3600; // mg/s
+  double calculateEmissionRate(double acre) => (4.0e7 * acre / 24) / 3600;
   double calculateWidth(double areaM2) => sqrt(areaM2) * (sqrt(2) / 2);
 
   double? calculatePM25(double rai, double windSpeed, double mixingHeight) {
@@ -86,6 +86,34 @@ class _WeatherForecastPageState extends State<WeatherForecastPage> {
     return list;
   }
 
+  // ------------ Fetch Disabled Hours from PHP ------------
+  Future<void> fetchDisabledHours() async {
+    try {
+      final url =
+          Uri.parse("http://localhost/flutter_fire/get_selected_hours.php");
+      final response = await http.get(url);
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body)['data'] ?? [];
+        Set<DateTime> temp = {};
+        for (var item in data) {
+          final dateParts = item['forecast_date'].split('-');
+          final hour = int.parse(item['forecast_hour'].split(':')[0]);
+          temp.add(DateTime(
+            int.parse(dateParts[0]),
+            int.parse(dateParts[1]),
+            int.parse(dateParts[2]),
+            hour,
+          ));
+        }
+        setState(() {
+          disabledHours = temp;
+        });
+      }
+    } catch (e) {
+      print("ไม่สามารถดึง disabled hours: $e");
+    }
+  }
+
   void loadForecast() async {
     if (rai <= 0) {
       setState(() {
@@ -101,6 +129,8 @@ class _WeatherForecastPageState extends State<WeatherForecastPage> {
     });
 
     try {
+      await fetchDisabledHours();
+
       final data = await fetchWeatherData(widget.latitude, widget.longitude);
 
       final filtered = data
@@ -112,9 +142,7 @@ class _WeatherForecastPageState extends State<WeatherForecastPage> {
         final dayKey = "${item.time.day.toString().padLeft(2, '0')}/"
             "${item.time.month.toString().padLeft(2, '0')}/"
             "${item.time.year}";
-        if (!grouped.containsKey(dayKey)) {
-          grouped[dayKey] = [];
-        }
+        grouped.putIfAbsent(dayKey, () => []);
         grouped[dayKey]!.add(item);
       }
 
@@ -211,6 +239,18 @@ class _WeatherForecastPageState extends State<WeatherForecastPage> {
                   final timeStr =
                       item.time.hour.toString().padLeft(2, '0') + ':00';
 
+                  final isDisabled = disabledHours.any((h) =>
+                      h.year == item.time.year &&
+                      h.month == item.time.month &&
+                      h.day == item.time.day &&
+                      h.hour == item.time.hour);
+
+                  final isSelected = selectedHours.any((h) =>
+                      h.year == item.time.year &&
+                      h.month == item.time.month &&
+                      h.day == item.time.day &&
+                      h.hour == item.time.hour);
+
                   return TableRow(
                     children: [
                       Padding(
@@ -228,19 +268,27 @@ class _WeatherForecastPageState extends State<WeatherForecastPage> {
                         padding: const EdgeInsets.symmetric(vertical: 6),
                         child: Text(status, textAlign: TextAlign.center),
                       ),
-                      Checkbox(
-                        value: selectedHours.contains(item.time),
-                        activeColor: Colors.black,
-                        checkColor: Colors.white,
-                        onChanged: (val) {
-                          setState(() {
-                            if (val == true) {
-                              selectedHours.add(item.time);
-                            } else {
-                              selectedHours.remove(item.time);
-                            }
-                          });
-                        },
+                      Center(
+                        child: Checkbox(
+                          value: isSelected,
+                          activeColor: Colors.black,
+                          checkColor: Colors.white,
+                          onChanged: isDisabled
+                              ? null
+                              : (val) {
+                                  setState(() {
+                                    if (val == true) {
+                                      selectedHours.add(item.time);
+                                    } else {
+                                      selectedHours.removeWhere((h) =>
+                                          h.year == item.time.year &&
+                                          h.month == item.time.month &&
+                                          h.day == item.time.day &&
+                                          h.hour == item.time.hour);
+                                    }
+                                  });
+                                },
+                        ),
                       ),
                     ],
                   );
@@ -253,7 +301,6 @@ class _WeatherForecastPageState extends State<WeatherForecastPage> {
     );
   }
 
-  /// 👉 บันทึกข้อมูลไปที่ PHP API
   void saveSelectedHours() async {
     if (selectedHours.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -263,10 +310,13 @@ class _WeatherForecastPageState extends State<WeatherForecastPage> {
     }
 
     List<Map<String, dynamic>> dataToSave = [];
-
     for (var date in groupedForecast.keys) {
       for (var hour in groupedForecast[date]!) {
-        if (selectedHours.contains(hour.time)) {
+        if (selectedHours.any((h) =>
+            h.year == hour.time.year &&
+            h.month == hour.time.month &&
+            h.day == hour.time.day &&
+            h.hour == hour.time.hour)) {
           dataToSave.add(hour.toMap(rai));
         }
       }
@@ -290,7 +340,6 @@ class _WeatherForecastPageState extends State<WeatherForecastPage> {
                 content: Text(
                     "✅ บันทึกข้อมูลเรียบร้อย (${dataToSave.length} ชั่วโมง)")),
           );
-          // ✅ กลับไปหน้า UserHomePage
           Navigator.pop(context);
         } else {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -478,8 +527,7 @@ class HourlyWeather {
       "humidity": humidity,
       "wind_speed": windSpeed,
       "boundary_height": mixingHeight,
-      "pm25_model":
-          double.parse(pm25(rai).toStringAsFixed(2)), // ✅ ปัด 2 ตำแหน่ง
+      "pm25_model": double.parse(pm25(rai).toStringAsFixed(2)),
     };
   }
 }

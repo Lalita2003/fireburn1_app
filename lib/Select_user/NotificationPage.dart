@@ -25,68 +25,70 @@ class _NotificationPageState extends State<NotificationPage> {
     fetchBurnRequestsAndNotify();
   }
 
-  // ดึง burn requests และสร้าง/อัปเดต notification
   Future<void> fetchBurnRequestsAndNotify() async {
     try {
+      // ดึง burn requests
       final burnResp = await http.get(Uri.parse("${baseUrl}burn_request.php"));
-      if (burnResp.statusCode == 200) {
-        final dynamic burnJson = json.decode(burnResp.body);
-        List<dynamic> burnData = [];
-
-        if (burnJson is List) {
-          burnData = burnJson;
-        } else if (burnJson is Map) {
-          if (burnJson['data'] is List) {
-            burnData = burnJson['data'];
-          } else {
-            burnData = [burnJson];
-          }
-        }
-
-        final filteredBurnData = burnData.where((item) {
-          if (item is Map<String, dynamic> && item.containsKey('user_id')) {
-            return item['user_id'].toString() == widget.userId.toString();
-          }
-          return false;
-        }).toList();
-
-        for (var requestRaw in filteredBurnData) {
-          final Map<String, dynamic> request =
-              Map<String, dynamic>.from(requestRaw);
-          String title = "คำขอเผาในพื้นที่ ${request['area_name']}";
-          String message =
-              "คำขอเผาขนาด ${request['area_size']} ไร่ | พืช: ${request['crop_type']}";
-
-          final checkResp = await http.get(Uri.parse(
-              "${baseUrl}check_notification.php?user_id=${widget.userId}&title=${Uri.encodeComponent(title)}&message=${Uri.encodeComponent(message)}"));
-
-          bool exists = false;
-          if (checkResp.statusCode == 200) {
-            final checkData = json.decode(checkResp.body);
-            if (checkData is Map) exists = checkData['exists'] ?? false;
-          }
-
-          if (!exists) {
-            await http.post(
-              Uri.parse("${baseUrl}notifications.php"),
-              body: {
-                'user_id': widget.userId.toString(),
-                'title': title,
-                'message': message,
-                'is_read': '0',
-              },
-            );
-          }
-        }
-
-        await fetchNotifications();
-      } else {
+      if (burnResp.statusCode != 200) {
         setState(() {
           errorMessage =
               "โหลดข้อมูลคำขอไม่สำเร็จ (code ${burnResp.statusCode})";
           isLoading = false;
         });
+        return;
       }
+
+      final dynamic burnJson = json.decode(burnResp.body);
+      List<dynamic> burnData = [];
+      if (burnJson is List) {
+        burnData = burnJson;
+      } else if (burnJson is Map) {
+        if (burnJson['data'] is List)
+          burnData = burnJson['data'];
+        else
+          burnData = [burnJson];
+      }
+
+      // กรองคำขอของ user ปัจจุบัน
+      final filteredBurnData = burnData.where((item) {
+        if (item is Map<String, dynamic> && item.containsKey('user_id')) {
+          return item['user_id'].toString() == widget.userId.toString();
+        }
+        return false;
+      }).toList();
+
+      // ดึง notifications ปัจจุบัน
+      await fetchNotifications();
+
+      // สร้าง notification ใหม่เฉพาะที่ยังไม่มีใน DB สำหรับ status ปัจจุบัน
+      for (var requestRaw in filteredBurnData) {
+        final Map<String, dynamic> request =
+            Map<String, dynamic>.from(requestRaw);
+        String title = "คำขอเผาในพื้นที่ ${request['area_name']}";
+        String message =
+            "คำขอเผาขนาด ${request['area_size']} ไร่ | พืช: ${request['crop_type']}";
+        String status = request['status']?.toString() ?? 'pending';
+
+        // ตรวจสอบใน server ก่อนสร้าง (รวม status)
+        bool exists = await checkNotificationExists(
+            widget.userId, title, message, status);
+
+        if (!exists) {
+          await http.post(
+            Uri.parse("${baseUrl}notifications.php"),
+            body: {
+              'user_id': widget.userId.toString(),
+              'title': title,
+              'message': message,
+              'status': status,
+              'is_read': '0',
+            },
+          );
+        }
+      }
+
+      // ดึง notifications ใหม่อีกครั้งเพื่ออัปเดต UI
+      await fetchNotifications();
     } catch (e) {
       setState(() {
         errorMessage = "เกิดข้อผิดพลาด: $e";
@@ -95,7 +97,21 @@ class _NotificationPageState extends State<NotificationPage> {
     }
   }
 
-  // ดึง notifications ของผู้ใช้
+  Future<bool> checkNotificationExists(
+      int userId, String title, String message, String status) async {
+    try {
+      final response = await http.get(Uri.parse(
+          "${baseUrl}check_notification.php?user_id=$userId&title=${Uri.encodeComponent(title)}&message=${Uri.encodeComponent(message)}&status=$status"));
+      if (response.statusCode == 200) {
+        final jsonResp = json.decode(response.body);
+        return jsonResp['exists'] ?? false;
+      }
+    } catch (e) {
+      // ignore
+    }
+    return false;
+  }
+
   Future<void> fetchNotifications() async {
     try {
       final response = await http.get(
@@ -117,24 +133,27 @@ class _NotificationPageState extends State<NotificationPage> {
             data = [jsonResp];
         }
 
-        final filteredData = data.where((item) {
-          if (item is Map<String, dynamic> && item.containsKey('user_id')) {
-            return item['user_id'].toString() == widget.userId.toString();
-          }
-          return false;
-        }).toList();
-
-        notifications = filteredData.map<Map<String, dynamic>>((itemRaw) {
-          final Map<String, dynamic> item = Map<String, dynamic>.from(itemRaw);
-          return {
-            'id': item['id'],
-            'title': item['title'],
-            'message': item['message'],
-            'is_read': item['is_read'] ?? 0,
-            'status': item['status']?.toString() ?? 'pending',
-            'user_id': item['user_id'],
-          };
-        }).toList();
+        // ลบ duplicate จากฐานข้อมูลโดยใช้ (title + message + status)
+        final seen = <String>{};
+        notifications = data
+            .map<Map<String, dynamic>>((itemRaw) {
+              final Map<String, dynamic> item =
+                  Map<String, dynamic>.from(itemRaw);
+              String key =
+                  "${item['title']}_${item['message']}_${item['status']}";
+              if (seen.contains(key)) return {};
+              seen.add(key);
+              return {
+                'id': item['id'],
+                'title': item['title'],
+                'message': item['message'],
+                'is_read': item['is_read'] ?? 0,
+                'status': item['status']?.toString() ?? 'pending',
+                'user_id': item['user_id'],
+              };
+            })
+            .where((element) => element.isNotEmpty)
+            .toList();
 
         setState(() {
           isLoading = false;
@@ -154,7 +173,6 @@ class _NotificationPageState extends State<NotificationPage> {
     }
   }
 
-  // mark notification as read
   Future<void> markAsRead(int notificationId) async {
     try {
       final response = await http.post(
@@ -178,7 +196,7 @@ class _NotificationPageState extends State<NotificationPage> {
         title: const Text("การแจ้งเตือน"),
         centerTitle: true,
         backgroundColor: const Color(0xFFEF6C00),
-        automaticallyImplyLeading: false, // ลบไอคอน Back
+        automaticallyImplyLeading: false,
       ),
       body: isLoading
           ? const Center(child: CircularProgressIndicator())
@@ -196,7 +214,6 @@ class _NotificationPageState extends State<NotificationPage> {
                         return InkWell(
                           onTap: () async {
                             await markAsRead(n['id']);
-                            // push แบบสามารถย้อนกลับมา NotificationPage ได้
                             Navigator.push(
                               context,
                               MaterialPageRoute(

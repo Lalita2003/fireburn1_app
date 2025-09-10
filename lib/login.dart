@@ -67,9 +67,9 @@ class _LoginPageState extends State<LoginPage> {
         } else if (role == 'village_head') {
           homePage = VillageHeadHomePage(userId: userId);
         } else if (role == 'officer') {
-          homePage = OfficerHomePage();
+          homePage = OfficerHomePage(userId: userId);
         } else if (role == 'admin') {
-          homePage = AdminHomePage();
+          homePage = AdminHomePage(userId: userId);
         } else {
           showSnack("บทบาทไม่ถูกต้อง");
           return;

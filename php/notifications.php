@@ -7,6 +7,7 @@ require "connect.php"; // ตัวแปรเชื่อมต่อเป็
 $user_id = isset($_POST['user_id']) ? (int)$_POST['user_id'] : 0;
 $title = isset($_POST['title']) ? trim($_POST['title']) : '';
 $message = isset($_POST['message']) ? trim($_POST['message']) : '';
+$status = isset($_POST['status']) ? trim($_POST['status']) : 'pending';
 $is_read = isset($_POST['is_read']) ? (int)$_POST['is_read'] : 0;
 
 // ตรวจสอบการเชื่อมต่อ
@@ -33,14 +34,14 @@ if ($user_check->num_rows === 0) {
 }
 
 // เตรียมคำสั่ง SQL
-$stmt = $con->prepare("INSERT INTO notifications (user_id, title, message, is_read, created_at) VALUES (?, ?, ?, ?, NOW())");
+$stmt = $con->prepare("INSERT INTO notifications (user_id, title, message, status, is_read, created_at) VALUES (?, ?, ?, ?, ?, NOW())");
 if (!$stmt) {
     echo json_encode(["success" => false, "error" => $con->error]);
     exit;
 }
 
 // Bind parameter
-$stmt->bind_param("issi", $user_id, $title, $message, $is_read);
+$stmt->bind_param("isssi", $user_id, $title, $message, $status, $is_read);
 
 // Execute
 if ($stmt->execute()) {
