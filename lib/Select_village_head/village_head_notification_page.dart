@@ -2,6 +2,8 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 
+import 'PendingRequestsPage.dart';
+
 class VillageHeadNotificationPage extends StatefulWidget {
   final int userId;
   final String village;
@@ -274,6 +276,16 @@ class _VillageHeadNotificationPageState
                             if (!isRead) {
                               await markAsRead(notif['id']);
                             }
+                            // Navigate ไป PendingRequestsPage
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => PendingRequestsPage(
+                                  userId: widget.userId,
+                                  village: widget.village,
+                                ),
+                              ),
+                            );
                           },
                         ),
                       );

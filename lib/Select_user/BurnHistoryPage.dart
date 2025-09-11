@@ -64,6 +64,42 @@ class _BurnHistoryPageState extends State<BurnHistoryPage> {
     }
   }
 
+  /// ฟังก์ชันยกเลิกคำขอ
+  Future<void> cancelRequest(String requestId) async {
+    try {
+      final uri = Uri.parse('http://localhost/flutter_fire/cancel_request.php');
+      final response = await http.post(
+        uri,
+        body: {
+          'request_id': requestId,
+          'user_id': widget.userId.toString(),
+        },
+      );
+
+      if (response.statusCode == 200) {
+        final res = json.decode(response.body);
+        if (res['success'] == true) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text("ยกเลิกคำขอเรียบร้อย")),
+          );
+          fetchBurnRequests(); // refresh list
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text("ไม่สามารถยกเลิกได้: ${res['message']}")),
+          );
+        }
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Error: ${response.statusCode}")),
+        );
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("เกิดข้อผิดพลาด: $e")),
+      );
+    }
+  }
+
   /// กำหนดสีตามสถานะ
   Color _getStatusColor(String? status) {
     switch (status?.toLowerCase()) {
@@ -176,6 +212,24 @@ class _BurnHistoryPageState extends State<BurnHistoryPage> {
                                   const SizedBox(height: 6),
                                   Text('ประเภทพืช: ${req['crop_type'] ?? '-'}'),
                                   Text('เหตุผล: ${req['purpose'] ?? '-'}'),
+
+                                  const SizedBox(height: 8),
+
+                                  // ปุ่มยกเลิก (แสดงเฉพาะสถานะ pending)
+                                  if (req['status']?.toLowerCase() == 'pending')
+                                    Align(
+                                      alignment: Alignment.centerRight,
+                                      child: ElevatedButton(
+                                        style: ElevatedButton.styleFrom(
+                                          backgroundColor: Colors.red,
+                                          foregroundColor: Colors.white,
+                                        ),
+                                        onPressed: () {
+                                          cancelRequest(req['id'].toString());
+                                        },
+                                        child: const Text("ยกเลิกคำขอ"),
+                                      ),
+                                    ),
                                 ],
                               ),
                             ),
